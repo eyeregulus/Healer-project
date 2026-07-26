@@ -18,6 +18,9 @@ class Consultation {
   late List<String> finalTags; // ex: ["#결정장애", "#미루기"]
   
   late DateTime createdAt;
+  
+  String clinicalObservation = '';
+  String aiMatchLevel = ''; // match, partial, mismatch, or empty
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -27,6 +30,8 @@ class Consultation {
     'aiOpinion': aiOpinion,
     'finalTags': finalTags,
     'createdAt': createdAt.toIso8601String(),
+    'clinicalObservation': clinicalObservation,
+    'aiMatchLevel': aiMatchLevel,
   };
 
   static Consultation fromJson(Map<String, dynamic> json) {
@@ -37,7 +42,9 @@ class Consultation {
       ..complaint = json['complaint'] as String
       ..aiOpinion = json['aiOpinion'] as String
       ..finalTags = List<String>.from(json['finalTags'] as List)
-      ..createdAt = DateTime.parse(json['createdAt'] as String);
+      ..createdAt = DateTime.parse(json['createdAt'] as String)
+      ..clinicalObservation = json['clinicalObservation'] as String? ?? ''
+      ..aiMatchLevel = json['aiMatchLevel'] as String? ?? '';
     return c;
   }
 }

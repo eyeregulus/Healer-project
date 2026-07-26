@@ -32,9 +32,11 @@ class GoogleSheetsService {
   static const _clientHeaders = [
     'id', 'name', 'birthDate', 'birthTime', 'birthCountry', 'birthCity',
     'timezoneOffset', 'note', 'placements', 'aspects',
+    'aiAnalysisResult', 'clinicalObservation', 'aiMatchLevel', 'clinicalTags', 'needsReview'
   ];
   static const _consultHeaders = [
     'id', 'clientId', 'clientName', 'complaint', 'aiOpinion', 'finalTags', 'createdAt',
+    'clinicalObservation', 'aiMatchLevel'
   ];
 
   // ── 인증 ──────────────────────────────────────────────────────────────────
@@ -92,6 +94,33 @@ class GoogleSheetsService {
 
     if (result.files != null && result.files!.isNotEmpty) {
       _spreadsheetId = result.files!.first.id;
+      
+      // 기존 스프레드시트가 있는 경우 시트 목록(탭 목록)을 가져와 검증합니다.
+      final ss = await _sheets!.spreadsheets.get(_spreadsheetId!);
+      final existingTitles = ss.sheets?.map((s) => s.properties?.title).toList() ?? [];
+      
+      final List<sheets_api.Request> requests = [];
+      if (!existingTitles.contains(_clientsSheet)) {
+        requests.add(sheets_api.Request(
+          addSheet: sheets_api.AddSheetRequest(
+            properties: sheets_api.SheetProperties(title: _clientsSheet),
+          ),
+        ));
+      }
+      if (!existingTitles.contains(_consultSheet)) {
+        requests.add(sheets_api.Request(
+          addSheet: sheets_api.AddSheetRequest(
+            properties: sheets_api.SheetProperties(title: _consultSheet),
+          ),
+        ));
+      }
+      
+      if (requests.isNotEmpty) {
+        await _sheets!.spreadsheets.batchUpdate(
+          sheets_api.BatchUpdateSpreadsheetRequest(requests: requests),
+          _spreadsheetId!,
+        );
+      }
     } else {
       final ss = await _sheets!.spreadsheets.create(
         sheets_api.Spreadsheet(
@@ -207,48 +236,65 @@ class GoogleSheetsService {
       c.note,
       c.placements.join(';'),
       c.aspects.join(';'),
-      c.latitude,
-      c.longitude,
+      c.aiAnalysisResult,
+      c.clinicalObservation,
+      c.aiMatchLevel,
+      c.clinicalTags.join(';'),
+      c.needsReview ? 'TRUE' : 'FALSE'
     ];
   }
 
   static Client? _rowToClient(List<dynamic> row) {
-    if (row.length < 10) return null;
+    if (row.length < 2) return null;
     try {
-      final country = row[4].toString();
-      final city = row[5].toString();
+      final c = Client()
+        ..id = int.parse(row[0].toString())
+        ..name = row[1].toString();
 
       // 날짜 파싱 (구글 시트 고유 일련번호로 변환되었을 경우도 방어)
-      String dateStr = row[2].toString().replaceAll("'", "");
-      DateTime bDate;
-      final serialDate = int.tryParse(dateStr);
-      if (serialDate != null && serialDate > 30000) {
-        bDate = DateTime(1899, 12, 30).add(Duration(days: serialDate));
+      if (row.length > 2) {
+        String dateStr = row[2].toString().replaceAll("'", "");
+        final serialDate = int.tryParse(dateStr);
+        if (serialDate != null && serialDate > 30000) {
+          c.birthDate = DateTime(1899, 12, 30).add(Duration(days: serialDate));
+        } else {
+          c.birthDate = DateTime.tryParse(dateStr) ?? DateTime.now();
+        }
       } else {
-        bDate = DateTime.parse(dateStr);
+        c.birthDate = DateTime.now();
       }
       
-      String timeStr = row[3].toString().replaceAll("'", "");
-      final serialTime = double.tryParse(timeStr);
-      if (serialTime != null && serialTime < 1.0) {
-        final totalMinutes = (serialTime * 24 * 60).round();
-        final h = totalMinutes ~/ 60;
-        final m = totalMinutes % 60;
-        timeStr = '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+      if (row.length > 3) {
+        String timeStr = row[3].toString().replaceAll("'", "");
+        final serialTime = double.tryParse(timeStr);
+        if (serialTime != null && serialTime < 1.0) {
+          final totalMinutes = (serialTime * 24 * 60).round();
+          final h = totalMinutes ~/ 60;
+          final m = totalMinutes % 60;
+          timeStr = '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+        }
+        c.birthTime = timeStr;
+      } else {
+        c.birthTime = '00:00';
       }
 
-      return Client()
-        ..id = int.parse(row[0].toString())
-        ..name = row[1].toString()
-        ..birthDate = bDate
-        ..birthTime = timeStr
-        ..birthPlace = '$country/$city'
-        ..latitude = row.length > 10 ? (double.tryParse(row[10].toString()) ?? 0.0) : 0.0
-        ..longitude = row.length > 11 ? (double.tryParse(row[11].toString()) ?? 0.0) : 0.0
-        ..timezoneOffset = double.parse(row[6].toString())
-        ..note = row[7].toString()
-        ..placements = row[8].toString().split(';').where((s) => s.isNotEmpty).toList()
-        ..aspects = row[9].toString().split(';').where((s) => s.isNotEmpty).toList();
+      final country = row.length > 4 ? row[4].toString() : '';
+      final city = row.length > 5 ? row[5].toString() : '';
+      c.birthPlace = '$country/$city';
+
+      c.timezoneOffset = row.length > 6 ? (double.tryParse(row[6].toString()) ?? 0.0) : 0.0;
+      c.note = row.length > 7 ? row[7].toString() : '';
+      c.placements = row.length > 8 ? row[8].toString().split(';').where((s) => s.isNotEmpty).toList() : [];
+      c.aspects = row.length > 9 ? row[9].toString().split(';').where((s) => s.isNotEmpty).toList() : [];
+      c.latitude = 0.0;
+      c.longitude = 0.0;
+      c.aiAnalysisResult = row.length > 10 ? row[10].toString() : '';
+      c.clinicalObservation = row.length > 11 ? row[11].toString() : '';
+      c.aiMatchLevel = row.length > 12 ? row[12].toString() : '';
+      c.clinicalTags = row.length > 13 ? row[13].toString().split(';').where((s) => s.isNotEmpty).toList() : [];
+      c.needsReview = row.length > 14 ? row[14].toString().toUpperCase() == 'TRUE' : false;
+
+      return c;
     } catch (_) {
       return null;
     }
@@ -285,19 +331,25 @@ class GoogleSheetsService {
         c.id, c.clientId, c.clientName, c.complaint, c.aiOpinion,
         c.finalTags.join(';'),
         c.createdAt.toIso8601String(),
+        c.clinicalObservation,
+        c.aiMatchLevel,
       ];
 
   static Consultation? _rowToConsultation(List<dynamic> row) {
-    if (row.length < 7) return null;
+    if (row.length < 3) return null;
     try {
-      return Consultation()
+      final c = Consultation()
         ..id = int.parse(row[0].toString())
         ..clientId = int.parse(row[1].toString())
-        ..clientName = row[2].toString()
-        ..complaint = row[3].toString()
-        ..aiOpinion = row[4].toString()
-        ..finalTags = row[5].toString().split(';').where((s) => s.isNotEmpty).toList()
-        ..createdAt = DateTime.parse(row[6].toString());
+        ..clientName = row[2].toString();
+      
+      c.complaint = row.length > 3 ? row[3].toString() : '';
+      c.aiOpinion = row.length > 4 ? row[4].toString() : '';
+      c.finalTags = row.length > 5 ? row[5].toString().split(';').where((s) => s.isNotEmpty).toList() : [];
+      c.createdAt = row.length > 6 ? DateTime.parse(row[6].toString()) : DateTime.now();
+      c.clinicalObservation = row.length > 7 ? row[7].toString() : '';
+      c.aiMatchLevel = row.length > 8 ? row[8].toString() : '';
+      return c;
     } catch (_) {
       return null;
     }
@@ -310,17 +362,22 @@ class GoogleSheetsService {
     if (!_initialized) return;
     try {
       final clientData = await _sheets!.spreadsheets.values
-          .get(_spreadsheetId!, '$_clientsSheet!A2:K');
+          .get(_spreadsheetId!, '$_clientsSheet!A2:Z');
       for (final row in clientData.values ?? []) {
         final client = _rowToClient(row);
         if (client != null) {
+          final localClient = await DatabaseService.isar.clients.get(client.id);
+          if (localClient != null) {
+            client.latitude = localClient.latitude;
+            client.longitude = localClient.longitude;
+          }
           await DatabaseService.isar
               .writeTxn(() async => DatabaseService.isar.clients.put(client));
         }
       }
 
       final consultData = await _sheets!.spreadsheets.values
-          .get(_spreadsheetId!, '$_consultSheet!A2:G');
+          .get(_spreadsheetId!, '$_consultSheet!A2:Z');
       for (final row in consultData.values ?? []) {
         final c = _rowToConsultation(row);
         if (c != null) {
@@ -337,13 +394,30 @@ class GoogleSheetsService {
   static Future<void> pushAll() async {
     if (!_initialized) return;
     try {
+      // 기존 구글 시트 데이터 초기화 (충돌 방지)
       await _sheets!.spreadsheets.values.clear(
           sheets_api.ClearValuesRequest(), _spreadsheetId!, '$_clientsSheet!A2:Z');
       await _sheets!.spreadsheets.values.clear(
           sheets_api.ClearValuesRequest(), _spreadsheetId!, '$_consultSheet!A2:Z');
 
-      final clients =
-          await DatabaseService.isar.clients.where().findAll();
+      final clients = await DatabaseService.isar.clients.where().findAll();
+      final consults = await DatabaseService.isar.consultations.where().findAll();
+
+      // 마이그레이션: 각 내담자의 상담이력 태그들을 내담자의 clinicalTags로 자동 취합 및 병합
+      for (final client in clients) {
+        final clientConsults = consults.where((c) => c.clientId == client.id);
+        final allConsultTags = clientConsults.expand((c) => c.finalTags).toList();
+        if (allConsultTags.isNotEmpty) {
+          final mergedTags = Set<String>.from(client.clinicalTags)..addAll(allConsultTags);
+          if (mergedTags.length > client.clinicalTags.length) {
+            client.clinicalTags = mergedTags.toList();
+            await DatabaseService.isar.writeTxn(() async {
+              await DatabaseService.isar.clients.put(client);
+            });
+          }
+        }
+      }
+
       if (clients.isNotEmpty) {
         await _sheets!.spreadsheets.values.append(
           sheets_api.ValueRange(
@@ -358,8 +432,6 @@ class GoogleSheetsService {
         );
       }
 
-      final consults =
-          await DatabaseService.isar.consultations.where().findAll();
       if (consults.isNotEmpty) {
         await _sheets!.spreadsheets.values.append(
           sheets_api.ValueRange(

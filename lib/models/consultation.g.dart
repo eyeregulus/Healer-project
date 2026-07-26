@@ -17,33 +17,43 @@ const ConsultationSchema = CollectionSchema(
   name: r'Consultation',
   id: 7048702844559806430,
   properties: {
-    r'aiOpinion': PropertySchema(
+    r'aiMatchLevel': PropertySchema(
       id: 0,
+      name: r'aiMatchLevel',
+      type: IsarType.string,
+    ),
+    r'aiOpinion': PropertySchema(
+      id: 1,
       name: r'aiOpinion',
       type: IsarType.string,
     ),
     r'clientId': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'clientId',
       type: IsarType.long,
     ),
     r'clientName': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'clientName',
       type: IsarType.string,
     ),
+    r'clinicalObservation': PropertySchema(
+      id: 4,
+      name: r'clinicalObservation',
+      type: IsarType.string,
+    ),
     r'complaint': PropertySchema(
-      id: 3,
+      id: 5,
       name: r'complaint',
       type: IsarType.string,
     ),
     r'createdAt': PropertySchema(
-      id: 4,
+      id: 6,
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
     r'finalTags': PropertySchema(
-      id: 5,
+      id: 7,
       name: r'finalTags',
       type: IsarType.stringList,
     )
@@ -95,8 +105,10 @@ int _consultationEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  bytesCount += 3 + object.aiMatchLevel.length * 3;
   bytesCount += 3 + object.aiOpinion.length * 3;
   bytesCount += 3 + object.clientName.length * 3;
+  bytesCount += 3 + object.clinicalObservation.length * 3;
   bytesCount += 3 + object.complaint.length * 3;
   bytesCount += 3 + object.finalTags.length * 3;
   {
@@ -114,12 +126,14 @@ void _consultationSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeString(offsets[0], object.aiOpinion);
-  writer.writeLong(offsets[1], object.clientId);
-  writer.writeString(offsets[2], object.clientName);
-  writer.writeString(offsets[3], object.complaint);
-  writer.writeDateTime(offsets[4], object.createdAt);
-  writer.writeStringList(offsets[5], object.finalTags);
+  writer.writeString(offsets[0], object.aiMatchLevel);
+  writer.writeString(offsets[1], object.aiOpinion);
+  writer.writeLong(offsets[2], object.clientId);
+  writer.writeString(offsets[3], object.clientName);
+  writer.writeString(offsets[4], object.clinicalObservation);
+  writer.writeString(offsets[5], object.complaint);
+  writer.writeDateTime(offsets[6], object.createdAt);
+  writer.writeStringList(offsets[7], object.finalTags);
 }
 
 Consultation _consultationDeserialize(
@@ -129,12 +143,14 @@ Consultation _consultationDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = Consultation();
-  object.aiOpinion = reader.readString(offsets[0]);
-  object.clientId = reader.readLong(offsets[1]);
-  object.clientName = reader.readString(offsets[2]);
-  object.complaint = reader.readString(offsets[3]);
-  object.createdAt = reader.readDateTime(offsets[4]);
-  object.finalTags = reader.readStringList(offsets[5]) ?? [];
+  object.aiMatchLevel = reader.readString(offsets[0]);
+  object.aiOpinion = reader.readString(offsets[1]);
+  object.clientId = reader.readLong(offsets[2]);
+  object.clientName = reader.readString(offsets[3]);
+  object.clinicalObservation = reader.readString(offsets[4]);
+  object.complaint = reader.readString(offsets[5]);
+  object.createdAt = reader.readDateTime(offsets[6]);
+  object.finalTags = reader.readStringList(offsets[7]) ?? [];
   object.id = id;
   return object;
 }
@@ -149,14 +165,18 @@ P _consultationDeserializeProp<P>(
     case 0:
       return (reader.readString(offset)) as P;
     case 1:
-      return (reader.readLong(offset)) as P;
-    case 2:
       return (reader.readString(offset)) as P;
+    case 2:
+      return (reader.readLong(offset)) as P;
     case 3:
       return (reader.readString(offset)) as P;
     case 4:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 5:
+      return (reader.readString(offset)) as P;
+    case 6:
+      return (reader.readDateTime(offset)) as P;
+    case 7:
       return (reader.readStringList(offset) ?? []) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -401,6 +421,142 @@ extension ConsultationQueryWhere
 
 extension ConsultationQueryFilter
     on QueryBuilder<Consultation, Consultation, QFilterCondition> {
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      aiMatchLevelEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'aiMatchLevel',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      aiMatchLevelGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'aiMatchLevel',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      aiMatchLevelLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'aiMatchLevel',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      aiMatchLevelBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'aiMatchLevel',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      aiMatchLevelStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'aiMatchLevel',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      aiMatchLevelEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'aiMatchLevel',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      aiMatchLevelContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'aiMatchLevel',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      aiMatchLevelMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'aiMatchLevel',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      aiMatchLevelIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'aiMatchLevel',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      aiMatchLevelIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'aiMatchLevel',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
       aiOpinionEqualTo(
     String value, {
@@ -724,6 +880,142 @@ extension ConsultationQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'clientName',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      clinicalObservationEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'clinicalObservation',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      clinicalObservationGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'clinicalObservation',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      clinicalObservationLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'clinicalObservation',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      clinicalObservationBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'clinicalObservation',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      clinicalObservationStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'clinicalObservation',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      clinicalObservationEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'clinicalObservation',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      clinicalObservationContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'clinicalObservation',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      clinicalObservationMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'clinicalObservation',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      clinicalObservationIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'clinicalObservation',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterFilterCondition>
+      clinicalObservationIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'clinicalObservation',
         value: '',
       ));
     });
@@ -1208,6 +1500,19 @@ extension ConsultationQueryLinks
 
 extension ConsultationQuerySortBy
     on QueryBuilder<Consultation, Consultation, QSortBy> {
+  QueryBuilder<Consultation, Consultation, QAfterSortBy> sortByAiMatchLevel() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'aiMatchLevel', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterSortBy>
+      sortByAiMatchLevelDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'aiMatchLevel', Sort.desc);
+    });
+  }
+
   QueryBuilder<Consultation, Consultation, QAfterSortBy> sortByAiOpinion() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'aiOpinion', Sort.asc);
@@ -1245,6 +1550,20 @@ extension ConsultationQuerySortBy
     });
   }
 
+  QueryBuilder<Consultation, Consultation, QAfterSortBy>
+      sortByClinicalObservation() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'clinicalObservation', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterSortBy>
+      sortByClinicalObservationDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'clinicalObservation', Sort.desc);
+    });
+  }
+
   QueryBuilder<Consultation, Consultation, QAfterSortBy> sortByComplaint() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'complaint', Sort.asc);
@@ -1272,6 +1591,19 @@ extension ConsultationQuerySortBy
 
 extension ConsultationQuerySortThenBy
     on QueryBuilder<Consultation, Consultation, QSortThenBy> {
+  QueryBuilder<Consultation, Consultation, QAfterSortBy> thenByAiMatchLevel() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'aiMatchLevel', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterSortBy>
+      thenByAiMatchLevelDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'aiMatchLevel', Sort.desc);
+    });
+  }
+
   QueryBuilder<Consultation, Consultation, QAfterSortBy> thenByAiOpinion() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'aiOpinion', Sort.asc);
@@ -1306,6 +1638,20 @@ extension ConsultationQuerySortThenBy
       thenByClientNameDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'clientName', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterSortBy>
+      thenByClinicalObservation() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'clinicalObservation', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QAfterSortBy>
+      thenByClinicalObservationDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'clinicalObservation', Sort.desc);
     });
   }
 
@@ -1348,6 +1694,13 @@ extension ConsultationQuerySortThenBy
 
 extension ConsultationQueryWhereDistinct
     on QueryBuilder<Consultation, Consultation, QDistinct> {
+  QueryBuilder<Consultation, Consultation, QDistinct> distinctByAiMatchLevel(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'aiMatchLevel', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Consultation, Consultation, QDistinct> distinctByAiOpinion(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -1365,6 +1718,14 @@ extension ConsultationQueryWhereDistinct
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'clientName', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<Consultation, Consultation, QDistinct>
+      distinctByClinicalObservation({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'clinicalObservation',
+          caseSensitive: caseSensitive);
     });
   }
 
@@ -1396,6 +1757,12 @@ extension ConsultationQueryProperty
     });
   }
 
+  QueryBuilder<Consultation, String, QQueryOperations> aiMatchLevelProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'aiMatchLevel');
+    });
+  }
+
   QueryBuilder<Consultation, String, QQueryOperations> aiOpinionProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'aiOpinion');
@@ -1411,6 +1778,13 @@ extension ConsultationQueryProperty
   QueryBuilder<Consultation, String, QQueryOperations> clientNameProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'clientName');
+    });
+  }
+
+  QueryBuilder<Consultation, String, QQueryOperations>
+      clinicalObservationProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'clinicalObservation');
     });
   }
 

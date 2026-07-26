@@ -3,6 +3,7 @@ import 'ai_service.dart';
 import 'database_service.dart';
 import 'google_sheets_service.dart';
 import 'models/consultation.dart';
+import 'models/client.dart';
 import 'app_snackbar.dart';
 import 'themes.dart';
 
@@ -29,7 +30,9 @@ class _AddConsultationScreenState extends State<AddConsultationScreen> {
   final _complaintController = TextEditingController();
   final _opinionController = TextEditingController();
   final _tagController = TextEditingController();
+  final _observationController = TextEditingController();
   
+  String _aiMatchLevel = ''; // match, partial, mismatch
   List<String> _tags = [];
   bool _isAnalyzing = false;
   bool _hasAnalyzed = false;
@@ -101,10 +104,22 @@ class _AddConsultationScreenState extends State<AddConsultationScreen> {
         ..complaint = _complaintController.text.trim()
         ..aiOpinion = _opinionController.text.trim()
         ..finalTags = _tags
+        ..clinicalObservation = _observationController.text.trim()
+        ..aiMatchLevel = _aiMatchLevel
         ..createdAt = DateTime.now();
 
       await DatabaseService.isar.writeTxn(() async {
         await DatabaseService.isar.consultations.put(consultation);
+        
+        // 내담자의 clinicalTags에도 이 상담의 태그들을 병합하여 저장합니다.
+        final client = await DatabaseService.isar.clients.get(widget.clientId);
+        if (client != null) {
+          final merged = Set<String>.from(client.clinicalTags)..addAll(_tags);
+          client.clinicalTags = merged.toList();
+          await DatabaseService.isar.clients.put(client);
+          // 내담자 정보도 구글 시트에 업데이트
+          GoogleSheetsService.upsertClient(client);
+        }
       });
 
       // 클라우드 동기화
@@ -126,6 +141,7 @@ class _AddConsultationScreenState extends State<AddConsultationScreen> {
     _complaintController.dispose();
     _opinionController.dispose();
     _tagController.dispose();
+    _observationController.dispose();
     super.dispose();
   }
 
@@ -256,6 +272,51 @@ class _AddConsultationScreenState extends State<AddConsultationScreen> {
                 ),
                 const SizedBox(height: 40),
 
+                // Step 4: 임상 관찰 및 피드백 (Clinical Observation & Match Level)
+                const Text(
+                  '임상 관찰 및 AI 피드백',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Themes.gold),
+                ),
+                const SizedBox(height: 8),
+                _buildCardContainer(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'AI 분석과의 실제 일치도',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          _matchChip('일치', 'match', Colors.green),
+                          const SizedBox(width: 8),
+                          _matchChip('부분 일치', 'partial', Colors.amber),
+                          const SizedBox(width: 8),
+                          _matchChip('불일치', 'mismatch', Colors.redAccent),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        '실제 관찰 및 피드백 노트',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _observationController,
+                        maxLines: 4,
+                        style: const TextStyle(fontSize: 14),
+                        decoration: const InputDecoration(
+                          hintText: '예: 상담 도중 실제로 언급된 심리적 특이사항이나 AI 분석과의 차이점을 기록해 두세요.',
+                          hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
+                          border: InputBorder.none,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 40),
+
                 // Save Button
                 ElevatedButton(
                   onPressed: _saveConsultation,
@@ -274,6 +335,33 @@ class _AddConsultationScreenState extends State<AddConsultationScreen> {
                 const SizedBox(height: 40),
               ],
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _matchChip(String label, String value, Color color) {
+    final isSelected = _aiMatchLevel == value;
+    return GestureDetector(
+      onTap: () => setState(() => _aiMatchLevel = isSelected ? '' : value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withValues(alpha: 0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? color : Colors.grey.withValues(alpha: 0.3),
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            color: isSelected ? color : Colors.grey,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),
         ),
       ),

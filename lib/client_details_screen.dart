@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:isar/isar.dart';
 import 'add_consultation_screen.dart';
+import 'transit_consultation_screen.dart';
 import 'ai_service.dart';
 import 'astrology_service.dart';
 import 'database_service.dart';
@@ -35,11 +36,9 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
 
   // Phase 2: 임상 관찰 노트 상태
   final _observationController = TextEditingController();
-  final _tagInputController = TextEditingController();
   String _aiMatchLevel = ''; // 'match' | 'partial' | 'mismatch' | ''
   List<String> _clinicalTags = [];
   bool _needsReview = false;
-  bool _isSavingNote = false;
 
   @override
   void initState() {
@@ -53,6 +52,9 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
     try {
       final client = await DatabaseService.isar.clients.get(widget.clientId);
       if (client != null) {
+        setState(() {
+          _client = client;
+        });
         _loadClinicalState();
         final consultations =
             await DatabaseService.isar.consultations
@@ -62,7 +64,6 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
                 .findAll();
 
         setState(() {
-          _client = client;
           _consultations = consultations;
           _isLoading = false;
         });
@@ -88,26 +89,27 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
 
   Future<void> _saveClinicalNote() async {
     if (_client == null) return;
-    setState(() => _isSavingNote = true);
     try {
       await DatabaseService.isar.writeTxn(() async {
         final fresh = await DatabaseService.isar.clients.get(_client!.id);
-        if (fresh == null) return;
-        fresh
-          ..clinicalObservation = _observationController.text.trim()
-          ..aiMatchLevel = _aiMatchLevel
-          ..clinicalTags = List<String>.from(_clinicalTags)
-          ..needsReview = _needsReview;
-        await DatabaseService.isar.clients.put(fresh);
-        _client = fresh;
+        if (fresh != null) {
+          fresh
+            ..clinicalObservation = _observationController.text
+            ..aiMatchLevel = _aiMatchLevel
+            ..clinicalTags = _clinicalTags
+            ..needsReview = _needsReview;
+          await DatabaseService.isar.clients.put(fresh);
+          _client = fresh;
+          
+          // 구글 시트에 즉시 업데이트
+          GoogleSheetsService.upsertClient(fresh);
+        }
       });
       if (mounted) {
         AppSnackBar.show(context, message: '임상 관찰 노트가 저장되었습니다.');
       }
     } catch (e) {
       if (mounted) AppSnackBar.show(context, message: '저장 실패: $e');
-    } finally {
-      if (mounted) setState(() => _isSavingNote = false);
     }
   }
 
@@ -226,7 +228,6 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
   void dispose() {
     _tabController.dispose();
     _observationController.dispose();
-    _tagInputController.dispose();
     super.dispose();
   }
 
@@ -306,26 +307,90 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder:
-                  (context) => AddConsultationScreen(
-                    clientId: _client!.id,
-                    clientName: _client!.name,
-                    placements: _client!.placements,
-                    aspects: _client!.aspects,
-                  ),
-            ),
-          );
-          if (result == true) _loadClientData();
-        },
+        onPressed: _showConsultationOptions,
         backgroundColor: Themes.gold,
         foregroundColor: Colors.black,
         icon: const Icon(Icons.add_comment_rounded),
         label: const Text('상담 작성'),
       ),
+    );
+  }
+
+  void _showConsultationOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const Text(
+                  '상담 방식 선택',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Themes.gold,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ListTile(
+                  leading: const Icon(Icons.history_edu_rounded, color: Themes.gold),
+                  title: const Text('일반 상담 작성 (네이탈 기반)'),
+                  subtitle: const Text('출생 차트 배치를 기반으로 심리적/진화적 기저를 분석하고 상담을 작성합니다.'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AddConsultationScreen(
+                          clientId: _client!.id,
+                          clientName: _client!.name,
+                          placements: _client!.placements,
+                          aspects: _client!.aspects,
+                        ),
+                      ),
+                    );
+                    if (result == true) _loadClientData();
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.auto_awesome_rounded, color: Themes.gold),
+                  title: const Text('실시간 트랜짓 AI 상담 (신규)'),
+                  subtitle: const Text('현재 대한민국 서울 상공의 트랜짓 행성과 출생 차트를 실시간 비교 분석합니다.'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TransitConsultationScreen(
+                          client: _client!,
+                        ),
+                      ),
+                    );
+                    if (result == true) _loadClientData();
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -389,6 +454,17 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
           _buildChartProfilePanel(longitudes),
           const SizedBox(height: 24),
 
+          // Progressed Lunar Phase Card
+          () {
+            final progressedData = AstrologyService.calculateProgressedLunarPhase(
+              birthDate: _client!.birthDate,
+              birthTime: _client!.birthTime,
+              timezoneOffset: _client!.timezoneOffset,
+            );
+            return _buildProgressedLunarCard(progressedData);
+          }(),
+          const SizedBox(height: 24),
+
           _buildSectionHeader('행성 위치 및 사인', Icons.wb_sunny_rounded),
           const SizedBox(height: 8),
           _buildChipsWrap(planetPlacements),
@@ -446,17 +522,18 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
                   }).toList(),
             ),
           const SizedBox(height: 28),
-
-          // ── 임상 관찰 노트 패널 ──
-          _buildClinicalNotesPanel(),
-          const SizedBox(height: 60),
         ],
       ),
     );
   }
 
-  Widget _buildClinicalNotesPanel() {
+  Widget _buildProgressedLunarCard(Map<String, dynamic> data) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final age = data['age'] as double;
+    final phaseName = data['phaseName'] as String;
+    final seasonName = data['seasonName'] as String;
+    final description = data['description'] as String;
+    final icon = data['icon'] as String;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -464,222 +541,59 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color:
-              _needsReview
-                  ? Colors.orangeAccent.withValues(alpha: 0.5)
-                  : Themes.gold.withValues(alpha: 0.2),
-          width: _needsReview ? 1.5 : 1.0,
+          color: Themes.gold.withValues(alpha: 0.2),
+          width: 1.0,
         ),
         boxShadow: [Themes.cardShadow(isDark)],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 헤더
-          Row(
-            children: [
-              const Icon(Icons.edit_note_rounded, color: Themes.gold, size: 20),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  '임상 관찰 노트',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Themes.gold,
-                  ),
-                ),
-              ),
-              // 재검토 필요 토글
-              GestureDetector(
-                onTap: () => setState(() => _needsReview = !_needsReview),
-                child: Row(
+          // Moon Phase Icon
+          Text(
+            icon,
+            style: const TextStyle(fontSize: 40),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Icon(
-                      _needsReview ? Icons.flag_rounded : Icons.flag_outlined,
-                      color: _needsReview ? Colors.orangeAccent : Colors.grey,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '재검토',
+                    const Text(
+                      '진행 달의 주기 (Progression)',
                       style: TextStyle(
                         fontSize: 12,
-                        color: _needsReview ? Colors.orangeAccent : Colors.grey,
+                        color: Themes.gold,
+                        fontWeight: FontWeight.bold,
                       ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '현재 나이: 만 ${age.toStringAsFixed(1)}세',
+                      style: const TextStyle(fontSize: 11, color: Colors.grey),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // 안내
-          Text(
-            'AI 기초 분석을 먼저 확인한 후, 실제 상담에서 관찰한 내용을 기록하세요.',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.withValues(alpha: 0.75),
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // 실제 관찰 텍스트
-          TextField(
-            controller: _observationController,
-            maxLines: 5,
-            style: const TextStyle(fontSize: 14, height: 1.6),
-            decoration: InputDecoration(
-              hintText: '예) 실제로 직장 상사와 갈등을 반복 언급. 아버지와의 관계에서 인정 욕구가 강함.',
-              hintStyle: TextStyle(
-                color: Colors.grey.withValues(alpha: 0.5),
-                fontSize: 13,
-              ),
-              filled: true,
-              fillColor:
-                  isDark
-                      ? Colors.white.withValues(alpha: 0.04)
-                      : Colors.black.withValues(alpha: 0.03),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Themes.gold, width: 1.2),
-              ),
-              contentPadding: const EdgeInsets.all(12),
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // AI 분석 일치도
-          const Text(
-            'AI 분석과의 일치도',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              _matchChip('일치', 'match', Colors.green),
-              const SizedBox(width: 8),
-              _matchChip('부분 일치', 'partial', Colors.amber),
-              const SizedBox(width: 8),
-              _matchChip('불일치', 'mismatch', Colors.redAccent),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // 패턴 태그
-          const Text(
-            '패턴 태그 (나중에 검색용)',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          if (_clinicalTags.isNotEmpty) ...[
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children:
-                  _clinicalTags.map((tag) {
-                    return GestureDetector(
-                      onTap: () => setState(() => _clinicalTags.remove(tag)),
-                      child: Chip(
-                        label: Text(
-                          tag,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.black,
-                          ),
-                        ),
-                        backgroundColor: Themes.gold.withValues(alpha: 0.8),
-                        deleteIcon: const Icon(
-                          Icons.close,
-                          size: 14,
-                          color: Colors.black54,
-                        ),
-                        onDeleted:
-                            () => setState(() => _clinicalTags.remove(tag)),
-                        padding: EdgeInsets.zero,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    );
-                  }).toList(),
-            ),
-            const SizedBox(height: 8),
-          ],
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _tagInputController,
-                  style: const TextStyle(fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: '#태그 입력 후 추가',
-                    hintStyle: TextStyle(
-                      color: Colors.grey.withValues(alpha: 0.5),
-                      fontSize: 13,
-                    ),
-                    filled: true,
-                    fillColor:
-                        isDark
-                            ? Colors.white.withValues(alpha: 0.04)
-                            : Colors.black.withValues(alpha: 0.03),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(
-                        color: Themes.gold,
-                        width: 1.0,
-                      ),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 10,
-                    ),
-                    isDense: true,
+                const SizedBox(height: 6),
+                Text(
+                  '$phaseName — $seasonName',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
-                  onSubmitted: (v) => _addTag(v),
                 ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: () => _addTag(_tagInputController.text),
-                icon: const Icon(Icons.add_circle_rounded, color: Themes.gold),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // 저장 버튼
-          ElevatedButton.icon(
-            onPressed: _isSavingNote ? null : _saveClinicalNote,
-            icon:
-                _isSavingNote
-                    ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.black,
-                      ),
-                    )
-                    : const Icon(Icons.save_rounded, size: 18),
-            label: const Text('관찰 노트 저장'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Themes.gold,
-              foregroundColor: Colors.black,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
+                const SizedBox(height: 6),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey,
+                    height: 1.4,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -687,45 +601,7 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
     );
   }
 
-  Widget _matchChip(String label, String value, Color color) {
-    final isSelected = _aiMatchLevel == value;
-    return GestureDetector(
-      onTap: () => setState(() => _aiMatchLevel = isSelected ? '' : value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color:
-              isSelected ? color.withValues(alpha: 0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? color : Colors.grey.withValues(alpha: 0.3),
-            width: isSelected ? 1.5 : 1.0,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            color: isSelected ? color : Colors.grey,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
-  }
 
-  void _addTag(String raw) {
-    final tag = raw.trim().startsWith('#') ? raw.trim() : '#${raw.trim()}';
-    if (tag.length > 1 && !_clinicalTags.contains(tag)) {
-      setState(() {
-        _clinicalTags.add(tag);
-        _tagInputController.clear();
-      });
-    } else {
-      _tagInputController.clear();
-    }
-  }
 
   // ─── 차트 프로필 패널 (음양 / 화토공수 / 퀄리티) ───────────────────────────
 
@@ -1169,6 +1045,66 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
                         style: const TextStyle(fontSize: 14),
                       ),
                       const SizedBox(height: 16),
+                      if (consultation.aiMatchLevel.isNotEmpty || consultation.clinicalObservation.isNotEmpty) ...[
+                        Row(
+                          children: [
+                            const Text(
+                              '임상 관찰 및 피드백',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Themes.gold,
+                              ),
+                            ),
+                            if (consultation.aiMatchLevel.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: consultation.aiMatchLevel == 'match'
+                                      ? Colors.green.withValues(alpha: 0.15)
+                                      : consultation.aiMatchLevel == 'partial'
+                                          ? Colors.amber.withValues(alpha: 0.15)
+                                          : Colors.redAccent.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: consultation.aiMatchLevel == 'match'
+                                        ? Colors.green
+                                        : consultation.aiMatchLevel == 'partial'
+                                            ? Colors.amber
+                                            : Colors.redAccent,
+                                    width: 1.0,
+                                  ),
+                                ),
+                                child: Text(
+                                  consultation.aiMatchLevel == 'match'
+                                      ? '일치'
+                                      : consultation.aiMatchLevel == 'partial'
+                                          ? '부분 일치'
+                                          : '불일치',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: consultation.aiMatchLevel == 'match'
+                                        ? Colors.green
+                                        : consultation.aiMatchLevel == 'partial'
+                                            ? Colors.amber
+                                            : Colors.redAccent,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (consultation.clinicalObservation.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            consultation.clinicalObservation,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                      ],
                       const Text(
                         '임상 분석 태그',
                         style: TextStyle(
@@ -1239,22 +1175,58 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
                 child: Icon(Icons.person, color: Colors.black),
               ),
               const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _client!.name,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Themes.gold,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          _client!.name,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Themes.gold,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _needsReview = !_needsReview;
+                            });
+                            _saveClinicalNote();
+                          },
+                          child: Chip(
+                            avatar: Icon(
+                              _needsReview ? Icons.star_rounded : Icons.star_border_rounded,
+                              size: 14,
+                              color: _needsReview ? Colors.black : Colors.grey,
+                            ),
+                            label: Text(
+                              '검토 필요',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: _needsReview ? Colors.black : Colors.grey,
+                                fontWeight: _needsReview ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                            backgroundColor: _needsReview ? Themes.gold : Colors.transparent,
+                            side: BorderSide(
+                              color: _needsReview ? Themes.gold : Colors.grey.withValues(alpha: 0.5),
+                            ),
+                            padding: EdgeInsets.zero,
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  Text(
-                    '$dateStr (${_client!.birthTime})',
-                    style: const TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
-                ],
+                    Text(
+                      '$dateStr (${_client!.birthTime})',
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1287,6 +1259,40 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
             ),
             const SizedBox(height: 4),
             Text(_client!.note, style: const TextStyle(fontSize: 14)),
+          ],
+          if (_clinicalTags.isNotEmpty) ...[
+            const Divider(height: 18, color: Colors.grey),
+            const Text(
+              '임상 패턴 태그 (검색용)',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Themes.gold,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: _clinicalTags.map((tag) {
+                return Chip(
+                  label: Text(
+                    tag,
+                    style: const TextStyle(fontSize: 11, color: Colors.black),
+                  ),
+                  backgroundColor: Themes.gold,
+                  deleteIcon: const Icon(Icons.close, size: 12, color: Colors.black54),
+                  onDeleted: () {
+                    setState(() {
+                      _clinicalTags.remove(tag);
+                    });
+                    _saveClinicalNote();
+                  },
+                  padding: EdgeInsets.zero,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                );
+              }).toList(),
+            ),
           ],
         ],
       ),

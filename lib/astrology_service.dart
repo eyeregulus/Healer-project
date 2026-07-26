@@ -561,4 +561,192 @@ class AstrologyService {
       'repSigns': repSignsKorean,          // e.g. ['♑ 염소자리', '♋ 게자리']
     };
   }
+
+  /// Calculates the progressed Sun-Moon angle and returns the progressed phase (season, phase name, description).
+  static Map<String, dynamic> calculateProgressedLunarPhase({
+    required DateTime birthDate,
+    required String birthTime,
+    required double timezoneOffset,
+  }) {
+    if (!_initialized) {
+      throw Exception('AstrologyService is not initialized. Call init() first.');
+    }
+
+    // 1. Calculate UTC birth time
+    final parts = birthTime.split(':');
+    final hour = int.parse(parts[0]);
+    final minute = int.parse(parts[1]);
+    final localDateTime = DateTime(birthDate.year, birthDate.month, birthDate.day, hour, minute);
+    final utcDateTime = localDateTime.subtract(Duration(minutes: (timezoneOffset * 60).round()));
+
+    // 2. Calculate age in years
+    final nowUtc = DateTime.now().toUtc();
+    final ageInDays = nowUtc.difference(utcDateTime).inDays;
+    final ageInYears = ageInDays / 365.242199; // Mean tropical year length
+
+    // 3. Progressed Date: 1 year of life = 1 day (24 hours) of time
+    final progressedUtc = utcDateTime.add(Duration(seconds: (ageInYears * 24 * 60 * 60).round()));
+    final hourUtc = progressedUtc.hour + progressedUtc.minute / 60.0 + progressedUtc.second / 3600.0;
+
+    final jd = Sweph.swe_julday(
+      progressedUtc.year,
+      progressedUtc.month,
+      progressedUtc.day,
+      hourUtc,
+      CalendarType.SE_GREG_CAL,
+    );
+
+    // 4. Calculate progressed Sun & Moon
+    final calcSun = Sweph.swe_calc_ut(jd, HeavenlyBody.SE_SUN, SwephFlag.SEFLG_SWIEPH);
+    final calcMoon = Sweph.swe_calc_ut(jd, HeavenlyBody.SE_MOON, SwephFlag.SEFLG_SWIEPH);
+
+    final sunLon = calcSun.longitude;
+    final moonLon = calcMoon.longitude;
+
+    // 5. Angle difference (Moon - Sun)
+    final diff = (moonLon - sunLon) % 360;
+
+    // 6. Map to phase & season
+    String phaseName = '';
+    String seasonName = '';
+    String description = '';
+    String icon = '';
+
+    if (diff >= 0 && diff < 45) {
+      phaseName = '신월 (New Moon)';
+      seasonName = '봄 (초기)';
+      description = '새로운 씨앗을 뿌리고 삶의 방향성을 새롭게 정립하는 시기';
+      icon = '🌑';
+    } else if (diff >= 45 && diff < 90) {
+      phaseName = '초승달 (Crescent)';
+      seasonName = '봄 (성장)';
+      description = '새로운 방향에 맞춰 구체적인 계획을 설계하고 전진하는 시기';
+      icon = '🌒';
+    } else if (diff >= 90 && diff < 135) {
+      phaseName = '상현달 (First Quarter)';
+      seasonName = '여름 (초기)';
+      description = '장애물을 돌파하고 과감하게 행동을 실행에 옮기는 시기';
+      icon = '🌓';
+    } else if (diff >= 135 && diff < 180) {
+      phaseName = '팽창달 (Gibbous)';
+      seasonName = '여름 (성숙)';
+      description = '행동의 성과를 거두기 직전, 세밀하게 디테일을 조율하고 보완하는 시기';
+      icon = '🌔';
+    } else if (diff >= 180 && diff < 225) {
+      phaseName = '만월 (Full Moon)';
+      seasonName = '가을 (초기)';
+      description = '노력했던 일의 결과가 만천하에 드러나고 객관적 성찰이 일어나는 시기';
+      icon = '🌕';
+    } else if (diff >= 225 && diff < 270) {
+      phaseName = '파종달 (Disseminating)';
+      seasonName = '가을 (성숙)';
+      description = '자신의 깨달음과 성과를 주변 사람들과 나누고 공유하는 시기';
+      icon = '🌖';
+    } else if (diff >= 270 && diff < 315) {
+      phaseName = '하현달 (Last Quarter)';
+      seasonName = '겨울 (초기)';
+      description = '불필요한 욕심이나 낡은 구조를 점진적으로 구조조정하고 내려놓는 시기';
+      icon = '🌗';
+    } else {
+      phaseName = '발사믹 (Balsamic)';
+      seasonName = '겨울 (깊은 비움)';
+      description = '봄이 오기 전 마지막 정화의 시기. 새로운 씨앗을 맞이하기 위해 비우고 휴식하는 단계';
+      icon = '🌘';
+    }
+
+    return {
+      'age': ageInYears,
+      'diffDegrees': diff,
+      'phaseName': phaseName,
+      'seasonName': seasonName,
+      'description': description,
+      'icon': icon,
+      'progressedDate': progressedUtc,
+    };
+  }
+
+  /// Calculates transit planetary longitudes for the current UTC time.
+  static Map<String, double> calculateTransitLongitudes() {
+    if (!_initialized) {
+      throw Exception('AstrologyService is not initialized. Call init() first.');
+    }
+
+    final nowUtc = DateTime.now().toUtc();
+    final hourUtc = nowUtc.hour + nowUtc.minute / 60.0 + nowUtc.second / 3600.0;
+    final jd = Sweph.swe_julday(
+      nowUtc.year,
+      nowUtc.month,
+      nowUtc.day,
+      hourUtc,
+      CalendarType.SE_GREG_CAL,
+    );
+
+    final bodies = {
+      'Sun': HeavenlyBody.SE_SUN,
+      'Moon': HeavenlyBody.SE_MOON,
+      'Mercury': HeavenlyBody.SE_MERCURY,
+      'Venus': HeavenlyBody.SE_VENUS,
+      'Mars': HeavenlyBody.SE_MARS,
+      'Jupiter': HeavenlyBody.SE_JUPITER,
+      'Saturn': HeavenlyBody.SE_SATURN,
+      'Uranus': HeavenlyBody.SE_URANUS,
+      'Neptune': HeavenlyBody.SE_NEPTUNE,
+      'Pluto': HeavenlyBody.SE_PLUTO,
+      'Chiron': HeavenlyBody.SE_CHIRON,
+      'NorthNode': HeavenlyBody.SE_TRUE_NODE,
+    };
+
+    final longitudes = <String, double>{};
+    for (final entry in bodies.entries) {
+      final name = entry.key;
+      final body = entry.value;
+      final calc = Sweph.swe_calc_ut(jd, body, SwephFlag.SEFLG_SWIEPH);
+      longitudes[name] = calc.longitude;
+    }
+    final northNodeLon = longitudes['NorthNode'] ?? 0.0;
+    longitudes['SouthNode'] = (northNodeLon + 180.0) % 360;
+
+    return longitudes;
+  }
+
+  /// Calculates Transit-to-Natal aspects.
+  static List<String> calculateTransitToNatalAspects({
+    required Map<String, double> natalLongitudes,
+    required Map<String, double> transitLongitudes,
+    double maxOrb = 3.0,
+  }) {
+    final activeTransits = <String>[];
+    
+    final transitPlanets = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto', 'Chiron', 'NorthNode', 'SouthNode'];
+    final natalPlanets = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto', 'Chiron', 'NorthNode', 'SouthNode', 'Ascendant', 'MC'];
+
+    const aspects = [
+      {'name': 'Conjunction', 'angle': 0.0},
+      {'name': 'Sextile', 'angle': 60.0},
+      {'name': 'Square', 'angle': 90.0},
+      {'name': 'Trine', 'angle': 120.0},
+      {'name': 'Opposition', 'angle': 180.0},
+    ];
+
+    for (final tp in transitPlanets) {
+      final tLon = transitLongitudes[tp];
+      if (tLon == null) continue;
+
+      for (final np in natalPlanets) {
+        final nLon = natalLongitudes[np];
+        if (nLon == null) continue;
+
+        final dist = angularDistance(tLon, nLon);
+        for (final aspect in aspects) {
+          final angle = aspect['angle'] as double;
+          final diff = (dist - angle).abs();
+          if (diff <= maxOrb) {
+            activeTransits.add('$tp-$np-${aspect['name']}');
+          }
+        }
+      }
+    }
+
+    return activeTransits;
+  }
 }
