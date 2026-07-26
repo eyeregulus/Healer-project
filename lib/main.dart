@@ -50,13 +50,16 @@ void main() async {
     return;
   }
 
-  // ☁️ Google Sheets 초기화 및 클라우드 동기화
-  try {
-    await GoogleSheetsService.signIn();
-    await GoogleSheetsService.pullAll(); // 클라우드 → 로컬 병합
-  } catch (e) {
-    print('Google Sheets init error: $e'); // 오프라인이면 로컬로만 동작
-  }
+  // ☁️ Google Sheets 초기화 및 클라우드 동기화 (앱 진입 속도 향상을 위해 백그라운드 비동기 실행)
+  // silent: true로 호출하여 이미 로그인된 경우에만 자동으로 동기화 작업을 수행하고,
+  // 로그인되지 않은 상태라면 로그인 UI 팝업을 강제로 띄우지 않습니다.
+  GoogleSheetsService.signIn(silent: true).then((success) {
+    if (success) {
+      GoogleSheetsService.pullAll(); // 클라우드 → 로컬 병합
+    }
+  }).catchError((e) {
+    debugPrint('Google Sheets background init error: $e'); // 오프라인이면 로컬로만 동작
+  });
 
   MobileAds.instance.initialize();
   runApp(const MyApp());
@@ -73,7 +76,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     // MaterialApp: 구글 Material Design 스타일의 앱을 만드는 틀입니다.
     return MaterialApp(
-      title: 'Healer Research', // 앱의 제목
+      title: 'Healer Project', // 앱의 제목
       // 🎨 앱 전체의 색상 테마를 설정합니다.
       theme: Themes.lightTheme,
       darkTheme: Themes.darkTheme,

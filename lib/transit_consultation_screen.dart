@@ -122,7 +122,7 @@ class _TransitConsultationScreenState extends State<TransitConsultationScreen> {
     final npSymbol = AstrologyService.planetSymbol[np] ?? '';
     final aSymbol = AstrologyService.aspectSymbol[type] ?? type;
 
-    return '트랜짓 $tpKorean ($tpSymbol) $aSymbol 네이탈 $npKorean ($npSymbol)';
+    return 'T $tpKorean ($tpSymbol) $aSymbol N $npKorean ($npSymbol)';
   }
 
   void _addCustomTag() {
@@ -169,7 +169,7 @@ class _TransitConsultationScreenState extends State<TransitConsultationScreen> {
 
     try {
       final formattedTime = _formatDateTime(_seoulTime);
-      final transitHeader = '[실시간 트랜짓 AI 분석 (서울 기준: $formattedTime)]\n';
+      final transitHeader = '[T AI 분석 (서울: $formattedTime)]\n';
       
       final consultation = Consultation()
         ..clientId = widget.client.id

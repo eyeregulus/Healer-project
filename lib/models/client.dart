@@ -10,9 +10,9 @@ class Client {
   late String name;
 
   late DateTime birthDate; // Local date of birth (YYYY-MM-DD)
-  late String birthTime;   // e.g. "14:30"
-  late String birthPlace;  // e.g. "Seoul"
-  
+  late String birthTime; // e.g. "14:30"
+  late String birthPlace; // e.g. "Seoul"
+
   late double latitude;
   late double longitude;
   late double timezoneOffset; // e.g. +9.0 for KST
@@ -65,23 +65,26 @@ class Client {
   };
 
   static Client fromJson(Map<String, dynamic> json) {
-    final client = Client()
-      ..id = (json['id'] as num).toInt()
-      ..name = json['name'] as String
-      ..birthDate = DateTime.parse(json['birthDate'] as String)
-      ..birthTime = json['birthTime'] as String
-      ..birthPlace = json['birthPlace'] as String
-      ..latitude = (json['latitude'] as num).toDouble()
-      ..longitude = (json['longitude'] as num).toDouble()
-      ..timezoneOffset = (json['timezoneOffset'] as num).toDouble()
-      ..placements = List<String>.from(json['placements'] as List)
-      ..aspects = List<String>.from(json['aspects'] as List)
-      ..note = json['note'] as String
-      ..clinicalObservation = json['clinicalObservation'] as String? ?? ''
-      ..aiMatchLevel = json['aiMatchLevel'] as String? ?? ''
-      ..clinicalTags = List<String>.from(json['clinicalTags'] as List? ?? [])
-      ..needsReview = json['needsReview'] as bool? ?? false
-      ..aiAnalysisResult = json['aiAnalysisResult'] as String? ?? '';
+    final client =
+        Client()
+          ..id = (json['id'] as num).toInt()
+          ..name = json['name'] as String
+          ..birthDate = DateTime.parse(json['birthDate'] as String)
+          ..birthTime = json['birthTime'] as String
+          ..birthPlace = json['birthPlace'] as String
+          ..latitude = (json['latitude'] as num).toDouble()
+          ..longitude = (json['longitude'] as num).toDouble()
+          ..timezoneOffset = (json['timezoneOffset'] as num).toDouble()
+          ..placements = List<String>.from(json['placements'] as List)
+          ..aspects = List<String>.from(json['aspects'] as List)
+          ..note = json['note'] as String
+          ..clinicalObservation = json['clinicalObservation'] as String? ?? ''
+          ..aiMatchLevel = json['aiMatchLevel'] as String? ?? ''
+          ..clinicalTags = List<String>.from(
+            json['clinicalTags'] as List? ?? [],
+          )
+          ..needsReview = json['needsReview'] as bool? ?? false
+          ..aiAnalysisResult = json['aiAnalysisResult'] as String? ?? '';
     return client;
   }
 }

@@ -39,6 +39,7 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
   String _aiMatchLevel = ''; // 'match' | 'partial' | 'mismatch' | ''
   List<String> _clinicalTags = [];
   bool _needsReview = false;
+  bool _isHeaderExpanded = false;
 
   @override
   void initState() {
@@ -100,11 +101,12 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
             ..needsReview = _needsReview;
           await DatabaseService.isar.clients.put(fresh);
           _client = fresh;
-          
-          // 구글 시트에 즉시 업데이트
-          GoogleSheetsService.upsertClient(fresh);
         }
       });
+      // 구글 시트에 즉시 업데이트 (트랜잭션 외부에서 실행)
+      if (_client != null) {
+        GoogleSheetsService.upsertClient(_client!);
+      }
       if (mounted) {
         AppSnackBar.show(context, message: '임상 관찰 노트가 저장되었습니다.');
       }
@@ -123,14 +125,15 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
     try {
       final isUnknown = _client!.birthTime == 'Unknown';
       List<String> filteredPlacements = _client!.placements;
-      
+
       if (isUnknown) {
-        filteredPlacements = _client!.placements.where((p) {
-          final pLower = p.toLowerCase();
-          return !pLower.contains('house') && 
-                 !pLower.contains('ascendant') && 
-                 !pLower.contains('mc');
-        }).toList();
+        filteredPlacements =
+            _client!.placements.where((p) {
+              final pLower = p.toLowerCase();
+              return !pLower.contains('house') &&
+                  !pLower.contains('ascendant') &&
+                  !pLower.contains('mc');
+            }).toList();
       }
 
       final result = await AiService.analyzeNatalChart(
@@ -146,9 +149,13 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
           fresh.aiAnalysisResult = result;
           await DatabaseService.isar.clients.put(fresh);
           _client = fresh;
-          GoogleSheetsService.upsertClient(fresh); // Also sync to sheets if needed
         }
       });
+
+      // 구글 시트에 즉시 업데이트 (트랜잭션 외부에서 실행)
+      if (_client != null) {
+        GoogleSheetsService.upsertClient(_client!);
+      }
 
       setState(() {
         _aiAnalysisResult = result;
@@ -203,6 +210,7 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
     );
 
     if (confirm == true) {
+      final List<int> consultIdsToDelete = [];
       await DatabaseService.isar.writeTxn(() async {
         await DatabaseService.isar.clients.delete(widget.clientId);
         final consultationsToDelete =
@@ -212,10 +220,15 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
                 .findAll();
         for (final consultation in consultationsToDelete) {
           await DatabaseService.isar.consultations.delete(consultation.id);
-          GoogleSheetsService.deleteConsultation(consultation.id);
+          consultIdsToDelete.add(consultation.id);
         }
       });
+
+      // 구글 시트 삭제는 트랜잭션 외부에서 수행
       GoogleSheetsService.deleteClient(widget.clientId);
+      for (final id in consultIdsToDelete) {
+        GoogleSheetsService.deleteConsultation(id);
+      }
 
       if (mounted) {
         AppSnackBar.show(context, message: '삭제되었습니다.');
@@ -349,20 +362,26 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
                 ),
                 const SizedBox(height: 20),
                 ListTile(
-                  leading: const Icon(Icons.history_edu_rounded, color: Themes.gold),
+                  leading: const Icon(
+                    Icons.history_edu_rounded,
+                    color: Themes.gold,
+                  ),
                   title: const Text('일반 상담 작성 (네이탈 기반)'),
-                  subtitle: const Text('출생 차트 배치를 기반으로 심리적/진화적 기저를 분석하고 상담을 작성합니다.'),
+                  subtitle: const Text(
+                    '출생 차트 배치를 기반으로 심리적/진화적 기저를 분석하고 상담을 작성합니다.',
+                  ),
                   onTap: () async {
                     Navigator.pop(context);
                     final result = await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => AddConsultationScreen(
-                          clientId: _client!.id,
-                          clientName: _client!.name,
-                          placements: _client!.placements,
-                          aspects: _client!.aspects,
-                        ),
+                        builder:
+                            (context) => AddConsultationScreen(
+                              clientId: _client!.id,
+                              clientName: _client!.name,
+                              placements: _client!.placements,
+                              aspects: _client!.aspects,
+                            ),
                       ),
                     );
                     if (result == true) _loadClientData();
@@ -370,17 +389,22 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
                 ),
                 const Divider(),
                 ListTile(
-                  leading: const Icon(Icons.auto_awesome_rounded, color: Themes.gold),
+                  leading: const Icon(
+                    Icons.auto_awesome_rounded,
+                    color: Themes.gold,
+                  ),
                   title: const Text('실시간 트랜짓 AI 상담 (신규)'),
-                  subtitle: const Text('현재 대한민국 서울 상공의 트랜짓 행성과 출생 차트를 실시간 비교 분석합니다.'),
+                  subtitle: const Text(
+                    '현재 대한민국 서울 상공의 트랜짓 행성과 출생 차트를 실시간 비교 분석합니다.',
+                  ),
                   onTap: () async {
                     Navigator.pop(context);
                     final result = await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => TransitConsultationScreen(
-                          client: _client!,
-                        ),
+                        builder:
+                            (context) =>
+                                TransitConsultationScreen(client: _client!),
                       ),
                     );
                     if (result == true) _loadClientData();
@@ -456,11 +480,12 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
 
           // Progressed Lunar Phase Card
           () {
-            final progressedData = AstrologyService.calculateProgressedLunarPhase(
-              birthDate: _client!.birthDate,
-              birthTime: _client!.birthTime,
-              timezoneOffset: _client!.timezoneOffset,
-            );
+            final progressedData =
+                AstrologyService.calculateProgressedLunarPhase(
+                  birthDate: _client!.birthDate,
+                  birthTime: _client!.birthTime,
+                  timezoneOffset: _client!.timezoneOffset,
+                );
             return _buildProgressedLunarCard(progressedData);
           }(),
           const SizedBox(height: 24),
@@ -550,10 +575,7 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Moon Phase Icon
-          Text(
-            icon,
-            style: const TextStyle(fontSize: 40),
-          ),
+          Text(icon, style: const TextStyle(fontSize: 40)),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -562,7 +584,7 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
                 Row(
                   children: [
                     const Text(
-                      '진행 달의 주기 (Progression)',
+                      'Progression',
                       style: TextStyle(
                         fontSize: 12,
                         color: Themes.gold,
@@ -571,7 +593,7 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
                     ),
                     const Spacer(),
                     Text(
-                      '현재 나이: 만 ${age.toStringAsFixed(1)}세',
+                      '나이: 만 ${age.toStringAsFixed(1)}세',
                       style: const TextStyle(fontSize: 11, color: Colors.grey),
                     ),
                   ],
@@ -600,8 +622,6 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
       ),
     );
   }
-
-
 
   // ─── 차트 프로필 패널 (음양 / 화토공수 / 퀄리티) ───────────────────────────
 
@@ -853,7 +873,7 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  '음양 비율 · 4원소 분포 · 퀄리티 · 에센셜 디그니티 · 강조 하우스 · 핵심 어스펙트 패턴\n\n'
+                  '음양 비율 · 4원소 분포 · 퀄리티 · 에센셜 디그니티 · 강조 하우스 · 핵심 어스펙트 패턴 · 노드적 해석 적용할것\n\n'
                   '⚠ AI 분석은 참고용 앵커입니다. 분석을 보고 난 후 실제 관찰과 비교하세요.',
                   style: TextStyle(
                     fontSize: 12,
@@ -982,6 +1002,9 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
         final createdStr =
             '${consultation.createdAt.year}년 ${consultation.createdAt.month}월 ${consultation.createdAt.day}일';
 
+        final isTransit = consultation.aiOpinion.startsWith('[실시간 트랜짓') ||
+            consultation.aiOpinion.startsWith('[T');
+
         return Container(
           margin: const EdgeInsets.only(bottom: 16),
           decoration: BoxDecoration(
@@ -996,12 +1019,38 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
           child: Theme(
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
             child: ExpansionTile(
-              title: Text(
-                createdStr,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Themes.gold,
-                ),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isTransit
+                          ? Colors.purple.withValues(alpha: 0.15)
+                          : Themes.gold.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: isTransit ? Colors.purple : Themes.gold,
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      isTransit ? 'T' : 'N',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: isTransit ? Colors.purpleAccent : Themes.gold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    createdStr,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Themes.gold,
+                    ),
+                  ),
+                ],
               ),
               subtitle: Text(
                 consultation.complaint,
@@ -1045,7 +1094,8 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
                         style: const TextStyle(fontSize: 14),
                       ),
                       const SizedBox(height: 16),
-                      if (consultation.aiMatchLevel.isNotEmpty || consultation.clinicalObservation.isNotEmpty) ...[
+                      if (consultation.aiMatchLevel.isNotEmpty ||
+                          consultation.clinicalObservation.isNotEmpty) ...[
                         Row(
                           children: [
                             const Text(
@@ -1059,18 +1109,27 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
                             if (consultation.aiMatchLevel.isNotEmpty) ...[
                               const SizedBox(width: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: consultation.aiMatchLevel == 'match'
-                                      ? Colors.green.withValues(alpha: 0.15)
-                                      : consultation.aiMatchLevel == 'partial'
+                                  color:
+                                      consultation.aiMatchLevel == 'match'
+                                          ? Colors.green.withValues(alpha: 0.15)
+                                          : consultation.aiMatchLevel ==
+                                              'partial'
                                           ? Colors.amber.withValues(alpha: 0.15)
-                                          : Colors.redAccent.withValues(alpha: 0.15),
+                                          : Colors.redAccent.withValues(
+                                            alpha: 0.15,
+                                          ),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: consultation.aiMatchLevel == 'match'
-                                        ? Colors.green
-                                        : consultation.aiMatchLevel == 'partial'
+                                    color:
+                                        consultation.aiMatchLevel == 'match'
+                                            ? Colors.green
+                                            : consultation.aiMatchLevel ==
+                                                'partial'
                                             ? Colors.amber
                                             : Colors.redAccent,
                                     width: 1.0,
@@ -1080,14 +1139,16 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
                                   consultation.aiMatchLevel == 'match'
                                       ? '일치'
                                       : consultation.aiMatchLevel == 'partial'
-                                          ? '부분 일치'
-                                          : '불일치',
+                                      ? '부분 일치'
+                                      : '불일치',
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
-                                    color: consultation.aiMatchLevel == 'match'
-                                        ? Colors.green
-                                        : consultation.aiMatchLevel == 'partial'
+                                    color:
+                                        consultation.aiMatchLevel == 'match'
+                                            ? Colors.green
+                                            : consultation.aiMatchLevel ==
+                                                'partial'
                                             ? Colors.amber
                                             : Colors.redAccent,
                                   ),
@@ -1148,151 +1209,210 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
   // ─── 공통 위젯 ────────────────────────────────────────────────────────────
 
   Widget _buildSummaryCard(String dateStr) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          Themes.cardShadow(Theme.of(context).brightness == Brightness.dark),
-        ],
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [Themes.cardShadow(isDark)],
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: Themes.cardGradient(
-            Theme.of(context).brightness == Brightness.dark,
-          ),
+          colors: Themes.cardGradient(isDark),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const CircleAvatar(
-                backgroundColor: Themes.gold,
-                child: Icon(Icons.person, color: Colors.black),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
+          // Row containing basic details and toggle
+          InkWell(
+            onTap: () {
+              setState(() {
+                _isHeaderExpanded = !_isHeaderExpanded;
+              });
+            },
+            borderRadius: BorderRadius.circular(10),
+            child: Row(
+              children: [
+                const CircleAvatar(
+                  radius: 14,
+                  backgroundColor: Themes.gold,
+                  child: Icon(Icons.person, color: Colors.black, size: 16),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            _client!.name,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Themes.gold,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${_client!.birthDate.year}.${_client!.birthDate.month}.${_client!.birthDate.day} (${_client!.birthTime})',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (!_isHeaderExpanded) ...[
+                        const SizedBox(height: 2),
                         Text(
-                          _client!.name,
+                          '출생지: ${_client!.birthPlace} (${_formatTimezone(_client!.birthPlace, _client!.timezoneOffset)})',
                           style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Themes.gold,
+                            fontSize: 11,
+                            color: Colors.grey,
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _needsReview = !_needsReview;
-                            });
-                            _saveClinicalNote();
-                          },
-                          child: Chip(
-                            avatar: Icon(
-                              _needsReview ? Icons.star_rounded : Icons.star_border_rounded,
-                              size: 14,
-                              color: _needsReview ? Colors.black : Colors.grey,
-                            ),
-                            label: Text(
-                              '검토 필요',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: _needsReview ? Colors.black : Colors.grey,
-                                fontWeight: _needsReview ? FontWeight.bold : FontWeight.normal,
-                              ),
-                            ),
-                            backgroundColor: _needsReview ? Themes.gold : Colors.transparent,
-                            side: BorderSide(
-                              color: _needsReview ? Themes.gold : Colors.grey.withValues(alpha: 0.5),
-                            ),
-                            padding: EdgeInsets.zero,
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
-                    ),
-                    Text(
-                      '$dateStr (${_client!.birthTime})',
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const Icon(
-                Icons.location_on_rounded,
-                size: 16,
-                color: Themes.gold,
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  '출생지: ${_client!.birthPlace} (${_formatTimezone(_client!.birthPlace, _client!.timezoneOffset)})',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-              ),
-            ],
-          ),
-          if (_client!.note.isNotEmpty) ...[
-            const Divider(height: 18, color: Colors.grey),
-            const Text(
-              '메모',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Themes.gold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(_client!.note, style: const TextStyle(fontSize: 14)),
-          ],
-          if (_clinicalTags.isNotEmpty) ...[
-            const Divider(height: 18, color: Colors.grey),
-            const Text(
-              '임상 패턴 태그 (검색용)',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Themes.gold,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: _clinicalTags.map((tag) {
-                return Chip(
-                  label: Text(
-                    tag,
-                    style: const TextStyle(fontSize: 11, color: Colors.black),
+                    ],
                   ),
-                  backgroundColor: Themes.gold,
-                  deleteIcon: const Icon(Icons.close, size: 12, color: Colors.black54),
-                  onDeleted: () {
+                ),
+                Icon(
+                  _isHeaderExpanded
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.keyboard_arrow_down_rounded,
+                  color: Themes.gold,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+
+          if (_isHeaderExpanded) ...[
+            const Divider(height: 16, color: Colors.grey),
+            // Review Chip
+            Row(
+              children: [
+                const Text(
+                  '상태: ',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: () {
                     setState(() {
-                      _clinicalTags.remove(tag);
+                      _needsReview = !_needsReview;
                     });
                     _saveClinicalNote();
                   },
-                  padding: EdgeInsets.zero,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                );
-              }).toList(),
+                  child: Chip(
+                    avatar: Icon(
+                      _needsReview
+                          ? Icons.star_rounded
+                          : Icons.star_border_rounded,
+                      size: 14,
+                      color: _needsReview ? Colors.black : Colors.grey,
+                    ),
+                    label: Text(
+                      '검토 필요',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: _needsReview ? Colors.black : Colors.grey,
+                        fontWeight:
+                            _needsReview ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                    backgroundColor:
+                        _needsReview ? Themes.gold : Colors.transparent,
+                    side: BorderSide(
+                      color:
+                          _needsReview
+                              ? Themes.gold
+                              : Colors.grey.withValues(alpha: 0.5),
+                    ),
+                    padding: EdgeInsets.zero,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
             ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(
+                  Icons.location_on_rounded,
+                  size: 16,
+                  color: Themes.gold,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    '출생지: ${_client!.birthPlace} (${_formatTimezone(_client!.birthPlace, _client!.timezoneOffset)})',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ),
+              ],
+            ),
+            if (_client!.note.isNotEmpty) ...[
+              const Divider(height: 16, color: Colors.grey),
+              const Text(
+                '메모',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Themes.gold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(_client!.note, style: const TextStyle(fontSize: 13)),
+            ],
+            if (_clinicalTags.isNotEmpty) ...[
+              const Divider(height: 16, color: Colors.grey),
+              const Text(
+                '임상 패턴 태그 (검색용)',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Themes.gold,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children:
+                    _clinicalTags.map((tag) {
+                      return Chip(
+                        label: Text(
+                          tag,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.black,
+                          ),
+                        ),
+                        backgroundColor: Themes.gold,
+                        deleteIcon: const Icon(
+                          Icons.close,
+                          size: 12,
+                          color: Colors.black54,
+                        ),
+                        onDeleted: () {
+                          setState(() {
+                            _clinicalTags.remove(tag);
+                          });
+                          _saveClinicalNote();
+                        },
+                        padding: EdgeInsets.zero,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      );
+                    }).toList(),
+              ),
+            ],
           ],
         ],
       ),

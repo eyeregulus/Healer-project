@@ -31,7 +31,7 @@ class GoogleSheetsService {
 
   static const _clientHeaders = [
     'id', 'name', 'birthDate', 'birthTime', 'birthCountry', 'birthCity',
-    'timezoneOffset', 'note', 'placements', 'aspects',
+    'timezoneOffset', 'note', 'placements', 'aspects', 'latitude', 'longitude',
     'aiAnalysisResult', 'clinicalObservation', 'aiMatchLevel', 'clinicalTags', 'needsReview'
   ];
   static const _consultHeaders = [
@@ -41,7 +41,7 @@ class GoogleSheetsService {
 
   // ── 인증 ──────────────────────────────────────────────────────────────────
 
-  static Future<bool> signIn() async {
+  static Future<bool> signIn({bool silent = false}) async {
     try {
       // google_sign_in 7.x: initialize → authenticate → authorizeScopes
       await _signIn.initialize(
@@ -52,7 +52,11 @@ class GoogleSheetsService {
       try {
         account = await _signIn.attemptLightweightAuthentication();
       } catch (_) {}
-      account ??= await _signIn.authenticate();
+
+      if (account == null) {
+        if (silent) return false;
+        account = await _signIn.authenticate();
+      }
 
       // 7.x: authorizationClient.authorizeScopes → accessToken
       final auth = await account.authorizationClient.authorizeScopes([
@@ -71,6 +75,7 @@ class GoogleSheetsService {
       return true;
     } catch (e) {
       debugPrint('Google Sheets signIn error: $e');
+      if (silent) return false;
       throw Exception('구글 로그인 에러: $e');
     }
   }
@@ -236,6 +241,8 @@ class GoogleSheetsService {
       c.note,
       c.placements.join(';'),
       c.aspects.join(';'),
+      c.latitude,
+      c.longitude,
       c.aiAnalysisResult,
       c.clinicalObservation,
       c.aiMatchLevel,
@@ -286,13 +293,13 @@ class GoogleSheetsService {
       c.note = row.length > 7 ? row[7].toString() : '';
       c.placements = row.length > 8 ? row[8].toString().split(';').where((s) => s.isNotEmpty).toList() : [];
       c.aspects = row.length > 9 ? row[9].toString().split(';').where((s) => s.isNotEmpty).toList() : [];
-      c.latitude = 0.0;
-      c.longitude = 0.0;
-      c.aiAnalysisResult = row.length > 10 ? row[10].toString() : '';
-      c.clinicalObservation = row.length > 11 ? row[11].toString() : '';
-      c.aiMatchLevel = row.length > 12 ? row[12].toString() : '';
-      c.clinicalTags = row.length > 13 ? row[13].toString().split(';').where((s) => s.isNotEmpty).toList() : [];
-      c.needsReview = row.length > 14 ? row[14].toString().toUpperCase() == 'TRUE' : false;
+      c.latitude = row.length > 10 ? (double.tryParse(row[10].toString()) ?? 0.0) : 0.0;
+      c.longitude = row.length > 11 ? (double.tryParse(row[11].toString()) ?? 0.0) : 0.0;
+      c.aiAnalysisResult = row.length > 12 ? row[12].toString() : '';
+      c.clinicalObservation = row.length > 13 ? row[13].toString() : '';
+      c.aiMatchLevel = row.length > 14 ? row[14].toString() : '';
+      c.clinicalTags = row.length > 15 ? row[15].toString().split(';').where((s) => s.isNotEmpty).toList() : [];
+      c.needsReview = row.length > 16 ? row[16].toString().toUpperCase() == 'TRUE' : false;
 
       return c;
     } catch (_) {

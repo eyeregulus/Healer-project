@@ -108,6 +108,8 @@ class _AddConsultationScreenState extends State<AddConsultationScreen> {
         ..aiMatchLevel = _aiMatchLevel
         ..createdAt = DateTime.now();
 
+      Client? updatedClient;
+
       await DatabaseService.isar.writeTxn(() async {
         await DatabaseService.isar.consultations.put(consultation);
         
@@ -117,12 +119,14 @@ class _AddConsultationScreenState extends State<AddConsultationScreen> {
           final merged = Set<String>.from(client.clinicalTags)..addAll(_tags);
           client.clinicalTags = merged.toList();
           await DatabaseService.isar.clients.put(client);
-          // 내담자 정보도 구글 시트에 업데이트
-          GoogleSheetsService.upsertClient(client);
+          updatedClient = client;
         }
       });
 
-      // 클라우드 동기화
+      // 클라우드 동기화 (트랜잭션 외부에서 실행)
+      if (updatedClient != null) {
+        GoogleSheetsService.upsertClient(updatedClient!);
+      }
       GoogleSheetsService.upsertConsultation(consultation);
 
       if (mounted) {

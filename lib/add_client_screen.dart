@@ -23,15 +23,25 @@ class _AddClientScreenState extends State<AddClientScreen> {
   final _cityController = TextEditingController();
   final _noteController = TextEditingController();
 
-  DateTime _selectedDate = DateTime.now();
-  TimeOfDay _selectedTime = const TimeOfDay(hour: 12, minute: 0);
+  // Birth date and time text controllers - empty by default!
+  final _yearController = TextEditingController();
+  final _monthController = TextEditingController();
+  final _dayController = TextEditingController();
+  final _hourController = TextEditingController();
+  final _minuteController = TextEditingController();
+
+  final _yearFocusNode = FocusNode();
+  final _monthFocusNode = FocusNode();
+  final _dayFocusNode = FocusNode();
+  final _hourFocusNode = FocusNode();
+  final _minuteFocusNode = FocusNode();
+
   bool _timeUnknown = false;
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    // Default to Seoul parameters
     _applySeoulDefaults();
   }
 
@@ -42,57 +52,38 @@ class _AddClientScreenState extends State<AddClientScreen> {
     });
   }
 
-  Future<void> _selectDate(BuildContext context) async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(1900),
-      lastDate: DateTime(2100),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: Themes.gold,
-              onPrimary: Colors.black,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
-    }
-  }
-
-  Future<void> _selectTime(BuildContext context) async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _selectedTime,
-      initialEntryMode: TimePickerEntryMode.input,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: Themes.gold,
-              onPrimary: Colors.black,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null && picked != _selectedTime) {
-      setState(() {
-        _selectedTime = picked;
-      });
-    }
-  }
-
   Future<void> _saveClient() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final year = int.tryParse(_yearController.text.trim());
+    final month = int.tryParse(_monthController.text.trim());
+    final day = int.tryParse(_dayController.text.trim());
+
+    if (year == null || month == null || day == null) {
+      AppSnackBar.show(context, message: '생년월일을 올바르게 입력해 주세요.');
+      return;
+    }
+
+    DateTime birthDate;
+    try {
+      birthDate = DateTime(year, month, day);
+    } catch (_) {
+      AppSnackBar.show(context, message: '유효한 날짜가 아닙니다.');
+      return;
+    }
+
+    int hour = 12;
+    int minute = 0;
+    if (!_timeUnknown) {
+      final h = int.tryParse(_hourController.text.trim());
+      final m = int.tryParse(_minuteController.text.trim());
+      if (h == null || m == null || h < 0 || h > 23 || m < 0 || m > 59) {
+        AppSnackBar.show(context, message: '태어난 시간을 올바르게 입력해 주세요 (0~23시, 0~59분).');
+        return;
+      }
+      hour = h;
+      minute = m;
+    }
 
     setState(() {
       _isSaving = true;
@@ -131,21 +122,21 @@ class _AddClientScreenState extends State<AddClientScreen> {
       final location = tz.getLocation(timezoneString);
       final tzDate = tz.TZDateTime(
         location,
-        _selectedDate.year,
-        _selectedDate.month,
-        _selectedDate.day,
-        _selectedTime.hour,
-        _selectedTime.minute,
+        birthDate.year,
+        birthDate.month,
+        birthDate.day,
+        hour,
+        minute,
       );
       final tzOffset = tzDate.timeZoneOffset.inMinutes / 60.0;
 
       final birthTimeStr = _timeUnknown
           ? 'Unknown'
-          : '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}';
+          : '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
       final birthTimeForCalc = _timeUnknown ? '12:00' : birthTimeStr;
 
       final chart = AstrologyService.calculateChart(
-        birthDate: _selectedDate,
+        birthDate: birthDate,
         birthTime: birthTimeForCalc,
         latitude: lat,
         longitude: lon,
@@ -154,9 +145,9 @@ class _AddClientScreenState extends State<AddClientScreen> {
 
       final client = Client()
         ..name = _nameController.text.trim()
-        ..birthDate = _selectedDate
+        ..birthDate = birthDate
         ..birthTime = birthTimeStr
-        ..birthPlace = '${_countryController.text.trim()}/${_cityController.text.trim()}'
+        ..birthPlace = '$country/$city'
         ..latitude = lat
         ..longitude = lon
         ..timezoneOffset = tzOffset
@@ -173,7 +164,7 @@ class _AddClientScreenState extends State<AddClientScreen> {
 
       if (mounted) {
         AppSnackBar.show(context, message: '내담자가 등록되었습니다.');
-        Navigator.of(context).pop(true); // Return true to trigger refresh
+        Navigator.of(context).pop(true);
       }
     } catch (e) {
       if (mounted) {
@@ -194,14 +185,21 @@ class _AddClientScreenState extends State<AddClientScreen> {
     _countryController.dispose();
     _cityController.dispose();
     _noteController.dispose();
+    _yearController.dispose();
+    _monthController.dispose();
+    _dayController.dispose();
+    _hourController.dispose();
+    _minuteController.dispose();
+    _yearFocusNode.dispose();
+    _monthFocusNode.dispose();
+    _dayFocusNode.dispose();
+    _hourFocusNode.dispose();
+    _minuteFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final dateStr = '${_selectedDate.year}년 ${_selectedDate.month}월 ${_selectedDate.day}일';
-    final timeStr = _selectedTime.format(context);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('내담자 신규 등록'),
@@ -232,86 +230,221 @@ class _AddClientScreenState extends State<AddClientScreen> {
                   },
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
-              // Date Picker Button
-              _buildInputContainer(
-                child: InkWell(
-                  onTap: () => _selectDate(context),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12.0),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.calendar_month_rounded, color: Themes.gold),
-                        const SizedBox(width: 16),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              '생년월일(양력)',
-                              style: TextStyle(fontSize: 12, color: Themes.gold),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              dateStr,
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              // Birth Date Input Row
+              const Text(
+                '생년월일 (양력)',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Themes.gold),
               ),
-              const SizedBox(height: 16),
-
-              _buildInputContainer(
-                child: Column(
-                  children: [
-                    InkWell(
-                      onTap: _timeUnknown ? null : () => _selectTime(context),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12.0),
-                        child: Row(
-                          children: [
-                            Icon(Icons.access_time_rounded,
-                                color: _timeUnknown ? Colors.grey : Themes.gold),
-                            const SizedBox(width: 16),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('태어난 시간',
-                                    style: TextStyle(fontSize: 12, color: Themes.gold)),
-                                const SizedBox(height: 4),
-                                Text(
-                                  _timeUnknown ? 'Unknown' : timeStr,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                    color: _timeUnknown ? Colors.grey : null,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: _buildInputContainer(
+                      child: TextFormField(
+                        controller: _yearController,
+                        focusNode: _yearFocusNode,
+                        keyboardType: TextInputType.number,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          hintText: 'YYYY',
+                          labelText: '년',
+                          labelStyle: TextStyle(color: Themes.gold),
+                          border: InputBorder.none,
                         ),
+                        onChanged: (value) {
+                          if (value.length == 4) {
+                            _monthFocusNode.requestFocus();
+                          }
+                        },
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) return '필수';
+                          final y = int.tryParse(value);
+                          if (y == null || y < 1900 || y > 2100) return '범위 오류';
+                          return null;
+                        },
                       ),
                     ),
-                    Row(
-                      children: [
-                        const SizedBox(width: 8),
-                        Checkbox(
-                          value: _timeUnknown,
-                          onChanged: (v) => setState(() => _timeUnknown = v ?? false),
-                          activeColor: Themes.gold,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildInputContainer(
+                      child: TextFormField(
+                        controller: _monthController,
+                        focusNode: _monthFocusNode,
+                        keyboardType: TextInputType.number,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          hintText: 'MM',
+                          labelText: '월',
+                          labelStyle: TextStyle(color: Themes.gold),
+                          border: InputBorder.none,
                         ),
-                        const Text('출생 시간 알 수 없음 (Unknown)',
-                            style: TextStyle(fontSize: 13, color: Colors.grey)),
-                      ],
+                        onChanged: (value) {
+                          if (value.length == 2) {
+                            _dayFocusNode.requestFocus();
+                          } else if (value.length == 1) {
+                            final val = int.tryParse(value);
+                            if (val != null && val >= 2 && val <= 9) {
+                              _dayFocusNode.requestFocus();
+                            }
+                          }
+                        },
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) return '필수';
+                          final m = int.tryParse(value);
+                          if (m == null || m < 1 || m > 12) return '오류';
+                          return null;
+                        },
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildInputContainer(
+                      child: TextFormField(
+                        controller: _dayController,
+                        focusNode: _dayFocusNode,
+                        keyboardType: TextInputType.number,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          hintText: 'DD',
+                          labelText: '일',
+                          labelStyle: TextStyle(color: Themes.gold),
+                          border: InputBorder.none,
+                        ),
+                        onChanged: (value) {
+                          if (value.length == 2) {
+                            if (_timeUnknown) {
+                              FocusScope.of(context).nextFocus();
+                            } else {
+                              _hourFocusNode.requestFocus();
+                            }
+                          } else if (value.length == 1) {
+                            final val = int.tryParse(value);
+                            if (val != null && val >= 4 && val <= 9) {
+                              if (_timeUnknown) {
+                                FocusScope.of(context).nextFocus();
+                              } else {
+                                _hourFocusNode.requestFocus();
+                              }
+                            }
+                          }
+                        },
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) return '필수';
+                          final d = int.tryParse(value);
+                          if (d == null || d < 1 || d > 31) return '오류';
+                          return null;
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Birth Time Input Row
+              const Text(
+                '태어난 시간 (24시간제)',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Themes.gold),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildInputContainer(
+                      child: TextFormField(
+                        controller: _hourController,
+                        focusNode: _hourFocusNode,
+                        enabled: !_timeUnknown,
+                        keyboardType: TextInputType.number,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          hintText: '시 (0-23)',
+                          labelText: '시',
+                          labelStyle: TextStyle(color: Themes.gold),
+                          border: InputBorder.none,
+                        ),
+                        onChanged: (value) {
+                          if (value.length == 2) {
+                            _minuteFocusNode.requestFocus();
+                          } else if (value.length == 1) {
+                            final val = int.tryParse(value);
+                            if (val != null && val >= 3 && val <= 9) {
+                              _minuteFocusNode.requestFocus();
+                            }
+                          }
+                        },
+                        validator: (value) {
+                          if (_timeUnknown) return null;
+                          if (value == null || value.trim().isEmpty) return '필수';
+                          final h = int.tryParse(value);
+                          if (h == null || h < 0 || h > 23) return '오류';
+                          return null;
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildInputContainer(
+                      child: TextFormField(
+                        controller: _minuteController,
+                        focusNode: _minuteFocusNode,
+                        enabled: !_timeUnknown,
+                        keyboardType: TextInputType.number,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          hintText: '분 (0-59)',
+                          labelText: '분',
+                          labelStyle: TextStyle(color: Themes.gold),
+                          border: InputBorder.none,
+                        ),
+                        onChanged: (value) {
+                          if (value.length == 2) {
+                            FocusScope.of(context).nextFocus();
+                          } else if (value.length == 1) {
+                            final val = int.tryParse(value);
+                            if (val != null && val >= 6 && val <= 9) {
+                              FocusScope.of(context).nextFocus();
+                            }
+                          }
+                        },
+                        validator: (value) {
+                          if (_timeUnknown) return null;
+                          if (value == null || value.trim().isEmpty) return '필수';
+                          final m = int.tryParse(value);
+                          if (m == null || m < 0 || m > 59) return '오류';
+                          return null;
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Checkbox(
+                    value: _timeUnknown,
+                    onChanged: (v) {
+                      setState(() {
+                        _timeUnknown = v ?? false;
+                        if (_timeUnknown) {
+                          _hourController.clear();
+                          _minuteController.clear();
+                        }
+                      });
+                    },
+                    activeColor: Themes.gold,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  const Text('출생 시간 알 수 없음 (Unknown)',
+                      style: TextStyle(fontSize: 13, color: Colors.grey)),
+                ],
               ),
               const SizedBox(height: 24),
 
@@ -321,7 +454,7 @@ class _AddClientScreenState extends State<AddClientScreen> {
                 children: [
                   const Text(
                     '출생지 정보',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Themes.gold),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Themes.gold),
                   ),
                   TextButton.icon(
                     onPressed: _applySeoulDefaults,
@@ -372,14 +505,12 @@ class _AddClientScreenState extends State<AddClientScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
 
               // Note Field
               const Text(
                 '기타 메모',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Themes.gold),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Themes.gold),
               ),
               const SizedBox(height: 8),
               _buildInputContainer(

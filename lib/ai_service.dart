@@ -19,8 +19,9 @@ class AiService {
       throw Exception('API Key가 설정되어 있지 않습니다. 설정 화면에서 API Key를 등록해 주세요.');
     }
 
-    final String analysisSteps = isTimeUnknown
-        ? '''
+    final String analysisSteps =
+        isTimeUnknown
+            ? '''
 [분석 순서]
 1. 음양(Yin/Yang) 비율 — 차트 전체의 에너지 방향성 (외향 vs 내향)
 2. 4원소 분포 (火/土/空/水) — 지배 원소와 결핍 원소, 그 심리적 의미
@@ -31,7 +32,7 @@ class AiService {
 
 *주의사항*: 출생 시간을 모르는 내담자이므로, 상승궁(Ascendant), 남중점(MC), 그리고 하우스(House) 영역에 대한 분석은 절대 포함하지 마세요.
 '''
-        : '''
+            : '''
 [분석 순서]
 1. 음양(Yin/Yang) 비율 — 차트 전체의 에너지 방향성 (외향 vs 내향)
 2. 4원소 분포 (火/土/空/水) — 지배 원소와 결핍 원소, 그 심리적 의미
@@ -126,7 +127,10 @@ $complaint
     required Preference pref,
   }) async {
     final isGemini = pref.customEndpoint.contains('generativelanguage');
-    var modelNameSanitized = pref.modelName.trim().toLowerCase().replaceAll(' ', '-');
+    var modelNameSanitized = pref.modelName.trim().toLowerCase().replaceAll(
+      ' ',
+      '-',
+    );
 
     if (modelNameSanitized.contains('gemini-1.5')) {
       modelNameSanitized = 'gemini-2.5-flash';
@@ -138,29 +142,31 @@ $complaint
 
     if (isGemini) {
       // Gemini Native REST API
-      final url = 'https://generativelanguage.googleapis.com/v1beta/models/$modelNameSanitized:generateContent?key=${pref.apiKey}';
+      final url =
+          'https://generativelanguage.googleapis.com/v1beta/models/$modelNameSanitized:generateContent?key=${pref.apiKey}';
       uri = Uri.parse(url);
-      headers = {
-        'Content-Type': 'application/json',
-      };
+      headers = {'Content-Type': 'application/json'};
       body = {
         "systemInstruction": {
-          "parts": [{"text": systemPrompt}]
+          "parts": [
+            {"text": systemPrompt},
+          ],
         },
         "contents": [
           {
-            "parts": [{"text": userContent}]
-          }
+            "parts": [
+              {"text": userContent},
+            ],
+          },
         ],
-        "generationConfig": {
-          "temperature": 0.7,
-        }
+        "generationConfig": {"temperature": 0.7},
       };
     } else {
       // OpenAI Compatible API
-      final endpoint = pref.customEndpoint.endsWith('/')
-          ? pref.customEndpoint.substring(0, pref.customEndpoint.length - 1)
-          : pref.customEndpoint;
+      final endpoint =
+          pref.customEndpoint.endsWith('/')
+              ? pref.customEndpoint.substring(0, pref.customEndpoint.length - 1)
+              : pref.customEndpoint;
       final url = '$endpoint/chat/completions';
       uri = Uri.parse(url);
       headers = {
@@ -192,7 +198,7 @@ $complaint
 
       if (response.statusCode == 200) {
         final json = jsonDecode(responseBody) as Map<String, dynamic>;
-        
+
         if (isGemini) {
           final candidates = json['candidates'] as List<dynamic>?;
           if (candidates != null && candidates.isNotEmpty) {
@@ -210,7 +216,9 @@ $complaint
         }
         throw Exception('AI 응답 결과가 비어 있습니다.');
       } else {
-        throw Exception('AI 요청 실패 (HTTP ${response.statusCode}):\n$responseBody');
+        throw Exception(
+          'AI 요청 실패 (HTTP ${response.statusCode}):\n$responseBody',
+        );
       }
     } catch (e) {
       rethrow;
@@ -250,7 +258,7 @@ $complaint
 - 이 트랜짓 시기를 지혜롭게 건너기 위해 가져야 할 마음가짐을 설명하세요.
 
 [필수 표기 규칙]
-1. 모든 행성, 사인, 어스펙트는 한글 텍스트 대신 반드시 기호(☉, ☽, ☿, ♀, ♂, ♃, ♄, ♅, ♆, ♇, ♈, ♉, ♊, ♋, ♌, ♍, ♎, ♏, ♐, ♑, ♒, ♓, ☌, ✶, □, △, ☍)로만 표기하세요.
+1. 모든 행성, 사인, 어스펙트는 한글 텍스트 대신 반드시 기호(☉, ☽, ☿, ♀, ♂, ♃, ♄, ♅, ♆, ♇, ☊, ☋, ⚵, ⚸, ⚶, ⚴, ⨂ ♈, ♉, ♊, ♋, ♌, ♍, ♎, ♏, ♐, ♑, ♒, ♓, ☌, ✶, □, △, ☍)로만 표기하세요.
 2. 4원소를 표기할 때는 반드시 한자(火, 土, 空, 水)를 사용하세요.
 3. 결과를 출력할 때 불필요한 서론이나 맺음말을 생략하고, 바로 본론으로 시작하여 간결하게 작성하세요.
 
@@ -301,8 +309,5 @@ class AiAnalysisResult {
   final String opinion;
   final List<String> recommendedTags;
 
-  AiAnalysisResult({
-    required this.opinion,
-    required this.recommendedTags,
-  });
+  AiAnalysisResult({required this.opinion, required this.recommendedTags});
 }

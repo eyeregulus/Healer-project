@@ -43,13 +43,15 @@ class AstrologyService {
   /// Calculates the chart data and returns a list of placements and aspects.
   static Map<String, List<String>> calculateChart({
     required DateTime birthDate, // Local birth date (year, month, day)
-    required String birthTime,   // e.g. "14:30"
+    required String birthTime, // e.g. "14:30"
     required double latitude,
     required double longitude,
     required double timezoneOffset, // e.g. +9.0 for KST
   }) {
     if (!_initialized) {
-      throw Exception('AstrologyService is not initialized. Call init() first.');
+      throw Exception(
+        'AstrologyService is not initialized. Call init() first.',
+      );
     }
 
     // 데이터 유실 방지: 위도/경도가 0.0일 경우 기본값(서울) 사용
@@ -59,9 +61,13 @@ class AstrologyService {
     }
 
     // Parse time
-    final parts = birthTime.split(':');
-    final hour = int.parse(parts[0]);
-    final minute = int.parse(parts[1]);
+    final effectiveTime =
+        (birthTime == 'Unknown' || !birthTime.contains(':'))
+            ? '12:00'
+            : birthTime;
+    final parts = effectiveTime.split(':');
+    final hour = int.tryParse(parts[0]) ?? 12;
+    final minute = int.tryParse(parts[1]) ?? 0;
 
     final localDateTime = DateTime(
       birthDate.year,
@@ -72,8 +78,13 @@ class AstrologyService {
     );
 
     // Convert local time to UTC
-    final utcDateTime = localDateTime.subtract(Duration(minutes: (timezoneOffset * 60).round()));
-    final hourUtc = utcDateTime.hour + utcDateTime.minute / 60.0 + utcDateTime.second / 3600.0;
+    final utcDateTime = localDateTime.subtract(
+      Duration(minutes: (timezoneOffset * 60).round()),
+    );
+    final hourUtc =
+        utcDateTime.hour +
+        utcDateTime.minute / 60.0 +
+        utcDateTime.second / 3600.0;
 
     // Calculate Julian Day in UT
     final jd = Sweph.swe_julday(
@@ -150,7 +161,9 @@ class AstrologyService {
     final southNodeLon = (northNodeLon + 180.0) % 360;
     longitudes['SouthNode'] = southNodeLon;
     placements.add('SouthNode in ${getZodiacSign(southNodeLon)}');
-    placements.add('SouthNode in ${getHouseForLongitude(southNodeLon, cusps)} House');
+    placements.add(
+      'SouthNode in ${getHouseForLongitude(southNodeLon, cusps)} House',
+    );
 
     // Calculate Part of Fortune (PoF)
     final sunLon = longitudes['Sun'] ?? 0.0;
@@ -158,9 +171,10 @@ class AstrologyService {
     final ascLon = ascendant;
     final sunHouse = getHouseForLongitude(sunLon, cusps);
     final isDayBirth = sunHouse >= 7 && sunHouse <= 12;
-    final pof = isDayBirth
-        ? (ascLon + moonLon - sunLon) % 360
-        : (ascLon - moonLon + sunLon) % 360;
+    final pof =
+        isDayBirth
+            ? (ascLon + moonLon - sunLon) % 360
+            : (ascLon - moonLon + sunLon) % 360;
     longitudes['Fortune'] = pof;
     placements.add('Fortune in ${getZodiacSign(pof)}');
     placements.add('Fortune in ${getHouseForLongitude(pof, cusps)} House');
@@ -168,12 +182,22 @@ class AstrologyService {
     // 3. Calculate Aspects
     // 메이저 행성 및 주요 감수점들만 어스펙트 계산에 포함하여 너무 많은 결과가 나오지 않도록 제한
     final majorAspectBodies = [
-      'Sun', 'Moon', 'Mercury', 'Venus', 'Mars',
-      'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto',
-      'Ascendant', 'MC'
+      'Sun',
+      'Moon',
+      'Mercury',
+      'Venus',
+      'Mars',
+      'Jupiter',
+      'Saturn',
+      'Uranus',
+      'Neptune',
+      'Pluto',
+      'Ascendant',
+      'MC',
     ];
-    
-    final aspectList = longitudes.keys.where((k) => majorAspectBodies.contains(k)).toList();
+
+    final aspectList =
+        longitudes.keys.where((k) => majorAspectBodies.contains(k)).toList();
     for (int i = 0; i < aspectList.length; i++) {
       for (int j = i + 1; j < aspectList.length; j++) {
         final b1 = aspectList[i];
@@ -189,10 +213,7 @@ class AstrologyService {
       }
     }
 
-    return {
-      'placements': placements,
-      'aspects': aspects,
-    };
+    return {'placements': placements, 'aspects': aspects};
   }
 
   /// Calculates the raw degrees of planets and house cusps for drawing the visual chart.
@@ -204,7 +225,9 @@ class AstrologyService {
     required double timezoneOffset,
   }) {
     if (!_initialized) {
-      throw Exception('AstrologyService is not initialized. Call init() first.');
+      throw Exception(
+        'AstrologyService is not initialized. Call init() first.',
+      );
     }
 
     // 데이터 유실 방지: 위도/경도가 0.0일 경우 기본값(서울) 사용
@@ -230,8 +253,13 @@ class AstrologyService {
       minute,
     );
 
-    final utcDateTime = unadjustedUtc.subtract(Duration(minutes: (timezoneOffset * 60).round()));
-    final hourUtc = utcDateTime.hour + utcDateTime.minute / 60.0 + utcDateTime.second / 3600.0;
+    final utcDateTime = unadjustedUtc.subtract(
+      Duration(minutes: (timezoneOffset * 60).round()),
+    );
+    final hourUtc =
+        utcDateTime.hour +
+        utcDateTime.minute / 60.0 +
+        utcDateTime.second / 3600.0;
 
     final jd = Sweph.swe_julday(
       utcDateTime.year,
@@ -285,7 +313,7 @@ class AstrologyService {
     final sunLon = longitudes['Sun'] ?? 0.0;
     final moonLon = longitudes['Moon'] ?? 0.0;
     final ascLon = ascendant;
-    
+
     // Day birth (Sun above horizon / Houses 7-12) vs Night birth (Sun below horizon / Houses 1-6)
     final sunHouse = _getHouseForLongitude(sunLon, cusps);
     final isDayBirth = sunHouse >= 7 && sunHouse <= 12;
@@ -295,10 +323,7 @@ class AstrologyService {
       longitudes['Fortune'] = (ascLon - moonLon + sunLon) % 360;
     }
 
-    return {
-      'longitudes': longitudes,
-      'cusps': cusps,
-    };
+    return {'longitudes': longitudes, 'cusps': cusps};
   }
 
   static int _getHouseForLongitude(double lon, List<double> cusps) {
@@ -318,8 +343,18 @@ class AstrologyService {
   /// Normalize degrees to 0-360 and find the Zodiac Sign
   static String getZodiacSign(double longitude) {
     const signs = [
-      'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
-      'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'
+      'Aries',
+      'Taurus',
+      'Gemini',
+      'Cancer',
+      'Leo',
+      'Virgo',
+      'Libra',
+      'Scorpio',
+      'Sagittarius',
+      'Capricorn',
+      'Aquarius',
+      'Pisces',
     ];
     final norm = longitude % 360;
     final idx = (norm / 30).floor();
@@ -380,60 +415,92 @@ class AstrologyService {
 
   // ── 행성 기호 (화면 표시용) ──────────────────────────────────────────────
   static const Map<String, String> planetSymbol = {
-    'Sun':        '☉',
-    'Moon':       '☽',
-    'Mercury':    '☿',
-    'Venus':      '♀',
-    'Mars':       '♂',
-    'Jupiter':    '♃',
-    'Saturn':     '♄',
-    'Uranus':     '♅',
-    'Neptune':    '♆',
-    'Pluto':      '♇',
-    'Chiron':     '⚷',
-    'NorthNode':  '☊',
-    'SouthNode':  '☋',
-    'Fortune':    '⊗',
-    'Lilith':     '⚸',
-    'Ceres':      '⚳',
-    'Pallas':     '⚴',
-    'Juno':       '⚵',
-    'Vesta':      '⚶',
-    'Ascendant':  'Asc',
-    'MC':         'MC',
+    'Sun': '☉',
+    'Moon': '☽',
+    'Mercury': '☿',
+    'Venus': '♀',
+    'Mars': '♂',
+    'Jupiter': '♃',
+    'Saturn': '♄',
+    'Uranus': '♅',
+    'Neptune': '♆',
+    'Pluto': '♇',
+    'Chiron': '⚷',
+    'NorthNode': '☊',
+    'SouthNode': '☋',
+    'Fortune': '⊗',
+    'Lilith': '⚸',
+    'Ceres': '⚳',
+    'Pallas': '⚴',
+    'Juno': '⚵',
+    'Vesta': '⚶',
+    'Ascendant': 'Asc',
+    'MC': 'MC',
   };
 
   // ── 한국어 라벨 (검색·태그용 텍스트 전용) ──────────────────────────────
   static const Map<String, String> planetKorean = {
-    'Sun': '태양', 'Moon': '달', 'Mercury': '수성', 'Venus': '금성',
-    'Mars': '화성', 'Jupiter': '목성', 'Saturn': '토성', 'Uranus': '천왕성',
-    'Neptune': '해왕성', 'Pluto': '명왕성', 'Chiron': '키론',
-    'NorthNode': '북노드', 'SouthNode': '남노드', 'Fortune': '포춘',
-    'Lilith': '릴리스', 'Ceres': '세레스', 'Pallas': '팔라스',
-    'Juno': '주노', 'Vesta': '베스타', 'Ascendant': 'Asc', 'MC': 'MC',
+    'Sun': '태양',
+    'Moon': '달',
+    'Mercury': '수성',
+    'Venus': '금성',
+    'Mars': '화성',
+    'Jupiter': '목성',
+    'Saturn': '토성',
+    'Uranus': '천왕성',
+    'Neptune': '해왕성',
+    'Pluto': '명왕성',
+    'Chiron': '키론',
+    'NorthNode': '북노드',
+    'SouthNode': '남노드',
+    'Fortune': '포춘',
+    'Lilith': '릴리스',
+    'Ceres': '세레스',
+    'Pallas': '팔라스',
+    'Juno': '주노',
+    'Vesta': '베스타',
+    'Ascendant': 'Asc',
+    'MC': 'MC',
   };
 
   // ── 황도 12궁 기호 ────────────────────────────────────────────────────────
   static const Map<String, String> zodiacSymbol = {
-    'Aries': '♈', 'Taurus': '♉', 'Gemini': '♊', 'Cancer': '♋',
-    'Leo': '♌', 'Virgo': '♍', 'Libra': '♎', 'Scorpio': '♏',
-    'Sagittarius': '♐', 'Capricorn': '♑', 'Aquarius': '♒', 'Pisces': '♓',
+    'Aries': '♈',
+    'Taurus': '♉',
+    'Gemini': '♊',
+    'Cancer': '♋',
+    'Leo': '♌',
+    'Virgo': '♍',
+    'Libra': '♎',
+    'Scorpio': '♏',
+    'Sagittarius': '♐',
+    'Capricorn': '♑',
+    'Aquarius': '♒',
+    'Pisces': '♓',
   };
 
   static const Map<String, String> zodiacKorean = {
-    'Aries': '양자리', 'Taurus': '황소자리', 'Gemini': '쌍둥이자리',
-    'Cancer': '게자리', 'Leo': '사자자리', 'Virgo': '처녀자리',
-    'Libra': '천칭자리', 'Scorpio': '전갈자리', 'Sagittarius': '사수자리',
-    'Capricorn': '염소자리', 'Aquarius': '물병자리', 'Pisces': '물고기자리',
+    'Aries': '양자리',
+    'Taurus': '황소자리',
+    'Gemini': '쌍둥이자리',
+    'Cancer': '게자리',
+    'Leo': '사자자리',
+    'Virgo': '처녀자리',
+    'Libra': '천칭자리',
+    'Scorpio': '전갈자리',
+    'Sagittarius': '사수자리',
+    'Capricorn': '염소자리',
+    'Aquarius': '물병자리',
+    'Pisces': '물고기자리',
   };
 
   // ── 어스펙트 기호 ─────────────────────────────────────────────────────────
   static const Map<String, String> aspectSymbol = {
     'Conjunction': '☌',
-    'Sextile':     '✶',
-    'Square':      '□',
-    'Trine':       '△',
-    'Opposition':  '☍',
+    'Sextile': '✶',
+    'Square': '□',
+    'Trine': '△',
+    'Opposition': '☍',
   };
 
   // ── 화면 표시: 배치 → 기호 ───────────────────────────────────────────────
@@ -470,38 +537,71 @@ class AstrologyService {
 
   // ── 차트 프로필 분석 (메이저 10행성 + Asc = 11개 기준) ───────────────────
   static const List<String> _majorBodies = [
-    'Sun', 'Moon', 'Mercury', 'Venus', 'Mars',
-    'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto', 'Ascendant',
+    'Sun',
+    'Moon',
+    'Mercury',
+    'Venus',
+    'Mars',
+    'Jupiter',
+    'Saturn',
+    'Uranus',
+    'Neptune',
+    'Pluto',
+    'Ascendant',
   ];
 
   static const Map<String, String> _signElement = {
-    'Aries': '화', 'Leo': '화', 'Sagittarius': '화',
-    'Taurus': '토', 'Virgo': '토', 'Capricorn': '토',
-    'Gemini': '공', 'Libra': '공', 'Aquarius': '공',
-    'Cancer': '수', 'Scorpio': '수', 'Pisces': '수',
+    'Aries': '화',
+    'Leo': '화',
+    'Sagittarius': '화',
+    'Taurus': '토',
+    'Virgo': '토',
+    'Capricorn': '토',
+    'Gemini': '공',
+    'Libra': '공',
+    'Aquarius': '공',
+    'Cancer': '수',
+    'Scorpio': '수',
+    'Pisces': '수',
   };
 
   static const Map<String, String> _signQuality = {
-    'Aries': '카디날', 'Cancer': '카디날', 'Libra': '카디날', 'Capricorn': '카디날',
-    'Taurus': '픽스드', 'Leo': '픽스드', 'Scorpio': '픽스드', 'Aquarius': '픽스드',
-    'Gemini': '뮤터블', 'Virgo': '뮤터블', 'Sagittarius': '뮤터블', 'Pisces': '뮤터블',
+    'Aries': '카디날',
+    'Cancer': '카디날',
+    'Libra': '카디날',
+    'Capricorn': '카디날',
+    'Taurus': '픽스드',
+    'Leo': '픽스드',
+    'Scorpio': '픽스드',
+    'Aquarius': '픽스드',
+    'Gemini': '뮤터블',
+    'Virgo': '뮤터블',
+    'Sagittarius': '뮤터블',
+    'Pisces': '뮤터블',
   };
 
   static const Set<String> _yangSigns = {
-    'Aries', 'Gemini', 'Leo', 'Libra', 'Sagittarius', 'Aquarius',
+    'Aries',
+    'Gemini',
+    'Leo',
+    'Libra',
+    'Sagittarius',
+    'Aquarius',
   };
 
   /// 원소 × 퀄리티 → 사인 룩업 테이블
   static const Map<String, Map<String, String>> _elementQualitySign = {
-    '화': {'카디날': 'Aries',     '픽스드': 'Leo',       '뮤터블': 'Sagittarius'},
-    '토': {'카디날': 'Capricorn', '픽스드': 'Taurus',    '뮤터블': 'Virgo'},
-    '공': {'카디날': 'Libra',     '픽스드': 'Aquarius',  '뮤터블': 'Gemini'},
-    '수': {'카디날': 'Cancer',    '픽스드': 'Scorpio',   '뮤터블': 'Pisces'},
+    '화': {'카디날': 'Aries', '픽스드': 'Leo', '뮤터블': 'Sagittarius'},
+    '토': {'카디날': 'Capricorn', '픽스드': 'Taurus', '뮤터블': 'Virgo'},
+    '공': {'카디날': 'Libra', '픽스드': 'Aquarius', '뮤터블': 'Gemini'},
+    '수': {'카디날': 'Cancer', '픽스드': 'Scorpio', '뮤터블': 'Pisces'},
   };
 
   /// 11개 행성 기준 음양/화토공수/퀄리티 분포 반환
   /// 대표 사인 = 지배 원소(공동 1위 모두) × 지배 퀄리티 교차점
-  static Map<String, dynamic> analyzeChartProfile(Map<String, double> longitudes) {
+  static Map<String, dynamic> analyzeChartProfile(
+    Map<String, double> longitudes,
+  ) {
     int fire = 0, earth = 0, air = 0, water = 0;
     int yin = 0, yang = 0;
     int cardinal = 0, fixed = 0, mutable_ = 0;
@@ -513,19 +613,29 @@ class AstrologyService {
 
       // 원소
       final el = _signElement[sign] ?? '';
-      if (el == '화') fire++;
-      else if (el == '토') earth++;
-      else if (el == '공') air++;
-      else if (el == '수') water++;
+      if (el == '화')
+        fire++;
+      else if (el == '토')
+        earth++;
+      else if (el == '공')
+        air++;
+      else if (el == '수')
+        water++;
 
       // 음양
-      if (_yangSigns.contains(sign)) yang++; else yin++;
+      if (_yangSigns.contains(sign))
+        yang++;
+      else
+        yin++;
 
       // 퀄리티
       final q = _signQuality[sign] ?? '';
-      if (q == '카디날') cardinal++;
-      else if (q == '픽스드') fixed++;
-      else mutable_++;
+      if (q == '카디날')
+        cardinal++;
+      else if (q == '픽스드')
+        fixed++;
+      else
+        mutable_++;
     }
 
     final elementCounts = {'화': fire, '토': earth, '공': air, '수': water};
@@ -533,24 +643,27 @@ class AstrologyService {
 
     // 지배 원소 최댓값 (공동 1위 모두 포함)
     final maxEl = elementCounts.values.reduce((a, b) => a > b ? a : b);
-    final dominantElements = elementCounts.entries
-        .where((e) => e.value == maxEl)
-        .map((e) => e.key)
-        .toList();
+    final dominantElements =
+        elementCounts.entries
+            .where((e) => e.value == maxEl)
+            .map((e) => e.key)
+            .toList();
 
     // 지배 퀄리티
-    final dominantQuality = qualityCounts.entries
-        .reduce((a, b) => a.value >= b.value ? a : b).key;
+    final dominantQuality =
+        qualityCounts.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
 
     // 대표 사인 = 지배 원소(들) × 지배 퀄리티
-    final repSigns = dominantElements
-        .map((el) => _elementQualitySign[el]?[dominantQuality] ?? '')
-        .where((s) => s.isNotEmpty)
-        .toList();
+    final repSigns =
+        dominantElements
+            .map((el) => _elementQualitySign[el]?[dominantQuality] ?? '')
+            .where((s) => s.isNotEmpty)
+            .toList();
 
-    final repSignsKorean = repSigns
-        .map((s) => '${zodiacSymbol[s] ?? ''} ${zodiacKorean[s] ?? s}')
-        .toList();
+    final repSignsKorean =
+        repSigns
+            .map((s) => '${zodiacSymbol[s] ?? ''} ${zodiacKorean[s] ?? s}')
+            .toList();
 
     return {
       'fire': fire, 'earth': earth, 'air': air, 'water': water,
@@ -558,7 +671,7 @@ class AstrologyService {
       'cardinal': cardinal, 'fixed': fixed, 'mutable': mutable_,
       'dominantElements': dominantElements,
       'dominantQuality': dominantQuality,
-      'repSigns': repSignsKorean,          // e.g. ['♑ 염소자리', '♋ 게자리']
+      'repSigns': repSignsKorean, // e.g. ['♑ 염소자리', '♋ 게자리']
     };
   }
 
@@ -569,15 +682,29 @@ class AstrologyService {
     required double timezoneOffset,
   }) {
     if (!_initialized) {
-      throw Exception('AstrologyService is not initialized. Call init() first.');
+      throw Exception(
+        'AstrologyService is not initialized. Call init() first.',
+      );
     }
 
     // 1. Calculate UTC birth time
-    final parts = birthTime.split(':');
-    final hour = int.parse(parts[0]);
-    final minute = int.parse(parts[1]);
-    final localDateTime = DateTime(birthDate.year, birthDate.month, birthDate.day, hour, minute);
-    final utcDateTime = localDateTime.subtract(Duration(minutes: (timezoneOffset * 60).round()));
+    final effectiveTime =
+        (birthTime == 'Unknown' || !birthTime.contains(':'))
+            ? '12:00'
+            : birthTime;
+    final parts = effectiveTime.split(':');
+    final hour = int.tryParse(parts[0]) ?? 12;
+    final minute = int.tryParse(parts[1]) ?? 0;
+    final localDateTime = DateTime(
+      birthDate.year,
+      birthDate.month,
+      birthDate.day,
+      hour,
+      minute,
+    );
+    final utcDateTime = localDateTime.subtract(
+      Duration(minutes: (timezoneOffset * 60).round()),
+    );
 
     // 2. Calculate age in years
     final nowUtc = DateTime.now().toUtc();
@@ -585,8 +712,13 @@ class AstrologyService {
     final ageInYears = ageInDays / 365.242199; // Mean tropical year length
 
     // 3. Progressed Date: 1 year of life = 1 day (24 hours) of time
-    final progressedUtc = utcDateTime.add(Duration(seconds: (ageInYears * 24 * 60 * 60).round()));
-    final hourUtc = progressedUtc.hour + progressedUtc.minute / 60.0 + progressedUtc.second / 3600.0;
+    final progressedUtc = utcDateTime.add(
+      Duration(seconds: (ageInYears * 24 * 60 * 60).round()),
+    );
+    final hourUtc =
+        progressedUtc.hour +
+        progressedUtc.minute / 60.0 +
+        progressedUtc.second / 3600.0;
 
     final jd = Sweph.swe_julday(
       progressedUtc.year,
@@ -597,8 +729,16 @@ class AstrologyService {
     );
 
     // 4. Calculate progressed Sun & Moon
-    final calcSun = Sweph.swe_calc_ut(jd, HeavenlyBody.SE_SUN, SwephFlag.SEFLG_SWIEPH);
-    final calcMoon = Sweph.swe_calc_ut(jd, HeavenlyBody.SE_MOON, SwephFlag.SEFLG_SWIEPH);
+    final calcSun = Sweph.swe_calc_ut(
+      jd,
+      HeavenlyBody.SE_SUN,
+      SwephFlag.SEFLG_SWIEPH,
+    );
+    final calcMoon = Sweph.swe_calc_ut(
+      jd,
+      HeavenlyBody.SE_MOON,
+      SwephFlag.SEFLG_SWIEPH,
+    );
 
     final sunLon = calcSun.longitude;
     final moonLon = calcMoon.longitude;
@@ -613,43 +753,43 @@ class AstrologyService {
     String icon = '';
 
     if (diff >= 0 && diff < 45) {
-      phaseName = '신월 (New Moon)';
-      seasonName = '봄 (초기)';
+      phaseName = 'New Moon';
+      seasonName = '봄(시작)';
       description = '새로운 씨앗을 뿌리고 삶의 방향성을 새롭게 정립하는 시기';
       icon = '🌑';
     } else if (diff >= 45 && diff < 90) {
-      phaseName = '초승달 (Crescent)';
-      seasonName = '봄 (성장)';
+      phaseName = 'Crescent Moon';
+      seasonName = '봄(성장)';
       description = '새로운 방향에 맞춰 구체적인 계획을 설계하고 전진하는 시기';
       icon = '🌒';
     } else if (diff >= 90 && diff < 135) {
-      phaseName = '상현달 (First Quarter)';
-      seasonName = '여름 (초기)';
+      phaseName = 'First Quarter';
+      seasonName = '여름(초기)';
       description = '장애물을 돌파하고 과감하게 행동을 실행에 옮기는 시기';
       icon = '🌓';
     } else if (diff >= 135 && diff < 180) {
-      phaseName = '팽창달 (Gibbous)';
-      seasonName = '여름 (성숙)';
+      phaseName = 'Gibbous Moon';
+      seasonName = '여름(성숙)';
       description = '행동의 성과를 거두기 직전, 세밀하게 디테일을 조율하고 보완하는 시기';
       icon = '🌔';
     } else if (diff >= 180 && diff < 225) {
-      phaseName = '만월 (Full Moon)';
-      seasonName = '가을 (초기)';
+      phaseName = 'Full Moon';
+      seasonName = '가을(초기)';
       description = '노력했던 일의 결과가 만천하에 드러나고 객관적 성찰이 일어나는 시기';
       icon = '🌕';
     } else if (diff >= 225 && diff < 270) {
-      phaseName = '파종달 (Disseminating)';
-      seasonName = '가을 (성숙)';
+      phaseName = 'Disseminating Moon';
+      seasonName = '가을(성숙)';
       description = '자신의 깨달음과 성과를 주변 사람들과 나누고 공유하는 시기';
       icon = '🌖';
     } else if (diff >= 270 && diff < 315) {
-      phaseName = '하현달 (Last Quarter)';
-      seasonName = '겨울 (초기)';
+      phaseName = 'Last Quarter';
+      seasonName = '겨울(초기)';
       description = '불필요한 욕심이나 낡은 구조를 점진적으로 구조조정하고 내려놓는 시기';
       icon = '🌗';
     } else {
-      phaseName = '발사믹 (Balsamic)';
-      seasonName = '겨울 (깊은 비움)';
+      phaseName = 'Balsamic Moon';
+      seasonName = '겨울(마지막)';
       description = '봄이 오기 전 마지막 정화의 시기. 새로운 씨앗을 맞이하기 위해 비우고 휴식하는 단계';
       icon = '🌘';
     }
@@ -668,7 +808,9 @@ class AstrologyService {
   /// Calculates transit planetary longitudes for the current UTC time.
   static Map<String, double> calculateTransitLongitudes() {
     if (!_initialized) {
-      throw Exception('AstrologyService is not initialized. Call init() first.');
+      throw Exception(
+        'AstrologyService is not initialized. Call init() first.',
+      );
     }
 
     final nowUtc = DateTime.now().toUtc();
@@ -716,9 +858,39 @@ class AstrologyService {
     double maxOrb = 3.0,
   }) {
     final activeTransits = <String>[];
-    
-    final transitPlanets = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto', 'Chiron', 'NorthNode', 'SouthNode'];
-    final natalPlanets = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto', 'Chiron', 'NorthNode', 'SouthNode', 'Ascendant', 'MC'];
+
+    final transitPlanets = [
+      'Sun',
+      'Moon',
+      'Mercury',
+      'Venus',
+      'Mars',
+      'Jupiter',
+      'Saturn',
+      'Uranus',
+      'Neptune',
+      'Pluto',
+      'Chiron',
+      'NorthNode',
+      'SouthNode',
+    ];
+    final natalPlanets = [
+      'Sun',
+      'Moon',
+      'Mercury',
+      'Venus',
+      'Mars',
+      'Jupiter',
+      'Saturn',
+      'Uranus',
+      'Neptune',
+      'Pluto',
+      'Chiron',
+      'NorthNode',
+      'SouthNode',
+      'Ascendant',
+      'MC',
+    ];
 
     const aspects = [
       {'name': 'Conjunction', 'angle': 0.0},
