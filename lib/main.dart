@@ -1,48 +1,49 @@
 // ✅ Flutter에서 화면을 그리는 데 필요한 기본 도구들을 불러옵니다.
-// 버튼, 텍스트, 색상 같은 모든 UI 부품이 여기 들어있어요!
 import 'package:flutter/material.dart';
-
-// ✅ 핸드폰의 상태바(시계, 배터리 표시줄)나 화면 방향 등을
-// 직접 조절할 수 있는 도구를 불러옵니다.
 import 'package:flutter/services.dart';
-
-// ✅ 구글 광고(배너 광고, 전면 광고 등)를 앱에 넣을 수 있게 해주는 도구입니다.
-// google_mobile_ads 패키지 버전: 5.3.1
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
-// ✅ 아래 4줄은 우리가 직접 만든 화면(파일)들을 불러오는 코드입니다.
-// 마치 레고 블록을 가져오는 것처럼, 각각의 화면 파일을 가져와요.
-import 'package:basic/splash_screen.dart'; // 앱을 켤 때 처음 보이는 로딩 화면
-import 'package:basic/home_screen.dart'; // 메인 홈 화면
-import 'package:basic/settings_screen.dart'; // 설정 화면
-import 'package:basic/info_screen.dart'; // 정보 화면
-import 'package:basic/themes.dart'; // 우리가 만든 예쁜 테마 설정 파일
+import 'package:basic/splash_screen.dart';
+import 'package:basic/home_screen.dart';
+import 'package:basic/settings_screen.dart';
+import 'package:basic/statistics_screen.dart';
+import 'package:basic/database_service.dart';
+import 'package:basic/astrology_service.dart';
+import 'package:basic/google_sheets_service.dart';
+import 'package:basic/themes.dart';
+import 'package:timezone/data/latest.dart' as tz;
 
 // ✅ 앱이 시작될 때 제일 먼저 실행되는 함수입니다.
 // 마치 컴퓨터를 켜면 바탕화면이 뜨는 것처럼, 앱이 켜지면 이 함수가 먼저 달립니다!
-void main() {
-  // Flutter 엔진이 완전히 준비될 때까지 기다립니다.
-  // 이걸 안 하면 광고 같은 기능이 제대로 작동 안 할 수 있어요.
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 📱 화면을 "가장자리까지 꽉 채우는" 모드로 설정합니다.
-  // 상태바나 내비게이션 바 뒤로도 앱 화면이 보이게 됩니다. (Android 15에서 권장)
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-
-  // 📱 상태바(시계·배터리 표시줄)와 내비게이션 바 색상을 투명하게 만듭니다.
-  // 그래야 배경색이 자연스럽게 이어져 보여요.
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
-      systemNavigationBarColor: Colors.transparent, // 아래 내비게이션 바: 투명
-      statusBarColor: Colors.transparent, // 위 상태바: 투명
+      systemNavigationBarColor: Colors.transparent,
+      statusBarColor: Colors.transparent,
     ),
   );
 
-  // 📢 구글 광고 SDK를 초기화(켜기)합니다.
-  // 광고를 보여주려면 먼저 이걸 실행해야 해요!
-  MobileAds.instance.initialize();
+  // 📦 로컬 DB 및 천문 계산 엔진, 시간대 초기화
+  try {
+    tz.initializeTimeZones();
+    await DatabaseService.init();
+    await AstrologyService.init();
+  } catch (e) {
+    print('Initialization error: $e');
+  }
 
-  // 🚀 MyApp 위젯을 화면에 띄웁니다. 여기서부터 앱이 시작돼요!
+  // ☁️ Google Sheets 초기화 및 클라우드 동기화
+  try {
+    await GoogleSheetsService.signIn();
+    await GoogleSheetsService.pullAll(); // 클라우드 → 로컬 병합
+  } catch (e) {
+    print('Google Sheets init error: $e'); // 오프라인이면 로컬로만 동작
+  }
+
+  MobileAds.instance.initialize();
   runApp(const MyApp());
 }
 
@@ -57,15 +58,14 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     // MaterialApp: 구글 Material Design 스타일의 앱을 만드는 틀입니다.
     return MaterialApp(
-      title: 'Flutter Demo', // 앱의 제목 (작업 관리자 같은 곳에서 보여요)
-      // 🎨 앱 전체의 색상 테마를 우리가 만든 예쁜 테마로 설정합니다.
-      theme: Themes.lightTheme, // 밝은 모드 테마
-      darkTheme: Themes.darkTheme, // 어두운 모드 테마
-      themeMode: ThemeMode.system, // 핸드폰 설정(밝음/어두움)에 따라 자동으로 바뀝니다.
-
+      title: 'Healer Research', // 앱의 제목
+      // 🎨 앱 전체의 색상 테마를 설정합니다.
+      theme: Themes.lightTheme,
+      darkTheme: Themes.darkTheme,
+      themeMode: ThemeMode.light, // 밝은 낮 테마를 기본으로 사용합니다.
       // 🏠 앱을 켰을 때 가장 먼저 보여줄 화면 = 스플래시 화면(로딩 화면)
       // SplashScreen이 끝나면 알아서 MainScreen으로 이동합니다.
-      home: const SplashScreen(),
+      home: SplashScreen(),
     );
   }
 }
@@ -84,15 +84,15 @@ class MainScreen extends StatefulWidget {
 // 언더바(_)로 시작하면 이 파일 안에서만 쓸 수 있다는 뜻이에요. (비공개)
 class _MainScreenState extends State<MainScreen> {
   // 현재 몇 번째 탭이 선택되었는지 저장하는 변수입니다.
-  // 0 = 홈, 1 = 설정, 2 = 정보
+  // 0 = 홈, 1 = 통계, 2 = 설정
   int _selectedIndex = 0;
 
   // 탭마다 보여줄 화면 목록입니다.
   // static const: 절대 바뀌지 않는 고정된 목록이에요.
   static const List<Widget> _widgetOptions = <Widget>[
-    HomeScreen(title: '홈'), // 0번: 홈 화면
-    SettingsScreen(), // 1번: 설정 화면
-    InfoScreen(), // 2번: 정보 화면
+    HomeScreen(title: '내담자 임상 기록'), // 0번: 홈 화면 (내담자 목록)
+    StatisticsScreen(), // 1번: 임상 통계 분석 화면
+    SettingsScreen(), // 2번: 설정 화면
   ];
 
   // 탭을 눌렀을 때 호출되는 함수입니다.
@@ -116,17 +116,19 @@ class _MainScreenState extends State<MainScreen> {
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: '홈',
-          ), // 집 모양 아이콘
+            icon: Icon(Icons.people_alt_rounded),
+            label: '내담자',
+          ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
+            icon: Icon(Icons.analytics_rounded),
+            label: '임상 통계',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings_rounded),
             label: '설정',
-          ), // 톱니바퀴 아이콘
-          BottomNavigationBarItem(icon: Icon(Icons.info), label: '정보'), // i 아이콘
+          ),
         ],
         currentIndex: _selectedIndex, // 현재 선택된 탭을 강조 표시
-        // selectedItemColor를 직접 지정하지 않으면 테마(Themes)의 설정을 그대로 사용합니다.
         onTap: _onItemTapped, // 탭을 누르면 _onItemTapped 함수 호출
       ),
     );

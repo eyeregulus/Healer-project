@@ -17,6 +17,8 @@ import 'package:in_app_update/in_app_update.dart';
 // 스플래시 화면이 끝나면 이 화면으로 이동해요.
 import 'main.dart';
 
+import 'package:flutter/foundation.dart';
+
 // ✅ SplashScreen: 앱을 켰을 때 가장 먼저 보이는 "로딩 화면"입니다.
 // 앱이 준비되는 동안 광고 로딩과 업데이트 확인을 진행해요.
 // StatefulWidget = 화면 상태가 바뀔 수 있는 위젯 (광고가 로드되면 상태가 바뀌니까요)
@@ -50,6 +52,14 @@ class _SplashScreenState extends State<SplashScreen> {
   // async = 시간이 걸리는 작업을 "기다리면서" 처리하겠다는 뜻이에요.
   // Future<void> = 결과값 없이 비동기로 실행되는 함수라는 뜻입니다.
   Future<void> _checkForUpdate() async {
+    if (kDebugMode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _goToHomePage();
+        }
+      });
+      return;
+    }
     try {
       // await: 업데이트 정보가 올 때까지 여기서 잠깐 기다립니다.
       AppUpdateInfo updateInfo = await InAppUpdate.checkForUpdate();
@@ -68,7 +78,7 @@ class _SplashScreenState extends State<SplashScreen> {
       // debugPrint는 개발할 때만 로그가 출력되어 배포 앱에서 더 안전해요!
       debugPrint('Failed to check for update: $e');
       _loadInterstitialAd(); // 오류가 나도 광고는 로드 시도
-      _navigateToHome();     // 오류가 나도 홈 화면으로 이동
+      _navigateToHome(); // 오류가 나도 홈 화면으로 이동
     }
   }
 
@@ -76,7 +86,8 @@ class _SplashScreenState extends State<SplashScreen> {
   // 광고는 로딩 시간이 필요하기 때문에 미리 준비해둬요!
   void _loadInterstitialAd() {
     InterstitialAd.load(
-      adUnitId: 'ca-app-pub-3940256099942544/1033173712', // 테스트용 광고 ID (배포 시 실제 ID로 변경!)
+      adUnitId:
+          'ca-app-pub-3940256099942544/1033173712', // 테스트용 광고 ID (배포 시 실제 ID로 변경!)
       request: const AdRequest(), // ✅ const: 변하지 않는 값이므로 const 사용 (메모리 절약)
       adLoadCallback: InterstitialAdLoadCallback(
         // 광고 로딩이 성공했을 때 실행됩니다.

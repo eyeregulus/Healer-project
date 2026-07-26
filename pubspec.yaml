@@ -14,11 +14,25 @@ dependencies:
   url_launcher: ^6.3.0
   in_app_update: ^4.2.2
   cupertino_icons: ^1.0.8
+  isar: ^3.1.0+1
+  isar_flutter_libs: ^3.1.0+1
+  path_provider: ^2.1.2
+  sweph: ^3.2.1+2.10.3
+  firebase_core: ^4.12.1
+  cloud_firestore: ^6.7.1
+  firebase_auth: ^6.5.6
+  google_sign_in: ^7.2.0
+  googleapis: ^16.0.0
+  timezone: ^0.11.1
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  build_runner: ^2.4.9
+  isar_generator: ^3.1.0+1
 
 flutter:
   uses-material-design: true
+
