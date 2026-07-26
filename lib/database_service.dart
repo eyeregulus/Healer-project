@@ -6,6 +6,8 @@ import 'models/preference.dart';
 
 class DatabaseService {
   static late Isar isar;
+  static bool _initialized = false;
+  static bool get isInitialized => _initialized;
 
   /// Open Isar database with all schemas and write default preferences if missing.
   static Future<void> init() async {
@@ -15,6 +17,8 @@ class DatabaseService {
       [ClientSchema, ConsultationSchema, PreferenceSchema],
       directory: dir.path,
     );
+
+    _initialized = true;
 
     // Insert default preferences if none exist
     final count = await isar.preferences.count();

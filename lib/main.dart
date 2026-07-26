@@ -32,7 +32,22 @@ void main() async {
     await DatabaseService.init();
     await AstrologyService.init();
   } catch (e) {
+    // DB 초기화 실패 시 에러 화면 노출
     print('Initialization error: $e');
+    runApp(MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Text(
+              '앱 초기화 중 오류가 발생했습니다.\n앱을 완전히 종료 후 다시 실행해 주세요.\n\n오류: $e',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ),
+    ));
+    return;
   }
 
   // ☁️ Google Sheets 초기화 및 클라우드 동기화

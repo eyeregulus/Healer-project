@@ -99,8 +99,18 @@ ${aspects.join('\n')}
 $complaint
 ''';
 
+    final symbolRule = '''
+
+[추가 필수 규칙]
+1. 모든 행성과 사인, 어스펙트는 한글 텍스트 대신 반드시 기호(☉, ☽, ☿, ♀, ♂, ♃, ♄, ♅, ♆, ♇, ♈, ♉, ♊, ♋, ♌, ♍, ♎, ♏, ♐, ♑, ♒, ♓, ☌, ✶, □, △, ☍)로만 표기하여 글 길이를 줄일 것.
+2. 4원소를 표기할 때는 반드시 한자(火, 土, 空, 水)를 사용할 것.
+3. 결과를 출력할 때 불필요한 서론이나 맺음말을 생략하고, 핵심 내용만 간결하게 요약하여 전달할 것.
+''';
+
+    final customSystemPrompt = pref.systemPrompt + symbolRule;
+
     final opinion = await _callApi(
-      systemPrompt: pref.systemPrompt,
+      systemPrompt: customSystemPrompt,
       userContent: userContent,
       pref: pref,
     );
