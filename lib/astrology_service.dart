@@ -434,7 +434,7 @@ class AstrologyService {
     'Pallas': '⚴',
     'Juno': '⚵',
     'Vesta': '⚶',
-    'Ascendant': 'Asc',
+    'Ascendant': 'ASC',
     'MC': 'MC',
   };
 
@@ -459,7 +459,7 @@ class AstrologyService {
     'Pallas': '팔라스',
     'Juno': '주노',
     'Vesta': '베스타',
-    'Ascendant': 'Asc',
+    'Ascendant': 'ASC',
     'MC': 'MC',
   };
 
@@ -504,7 +504,7 @@ class AstrologyService {
   };
 
   // ── 화면 표시: 배치 → 기호 ───────────────────────────────────────────────
-  /// e.g. "Sun in Leo" → "☉ ♌"  |  "Sun in 9th House" → "☉ 9H"  |  "Mercury Retrograde" → "☿ ℞"
+  /// e.g. "Sun in Leo" → "☉ ♌"  |  "Sun in 9th House" → "☉ 9ℎ"  |  "Mercury Retrograde" → "☿ ℞"
   static String translatePlacement(String placement) {
     if (placement.endsWith('Retrograde')) {
       final planet = placement.split(' ')[0];
@@ -514,7 +514,7 @@ class AstrologyService {
       final parts = placement.split(' in ');
       final planet = parts[0];
       final house = parts[1].replaceFirst(' House', '');
-      return '${planetSymbol[planet] ?? planet} ${house}H';
+      return '${planetSymbol[planet] ?? planet} ${house}ℎ';
     }
     if (placement.contains(' in ')) {
       final parts = placement.split(' in ');

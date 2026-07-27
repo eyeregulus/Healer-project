@@ -77,7 +77,7 @@ class NatalChartPainter extends CustomPainter {
     'Pallas': '⚴\u{FE0E}',
     'Juno': '⚵\u{FE0E}',
     'Vesta': '⚶\u{FE0E}',
-    'Ascendant': 'Asc',
+    'Ascendant': 'ASC',
     'MC': 'MC',
   };
 

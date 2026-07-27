@@ -495,7 +495,7 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
           _buildChipsWrap(planetPlacements),
           const SizedBox(height: 20),
 
-          _buildSectionHeader('하우스 배치', Icons.home_rounded),
+          _buildSectionHeader('ℎ 배치', Icons.home_rounded),
           const SizedBox(height: 8),
           _buildChipsWrap(housePlacements),
           const SizedBox(height: 20),
@@ -873,7 +873,7 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  '음양 비율 · 4원소 분포 · 퀄리티 · 에센셜 디그니티 · 강조 하우스 · 핵심 어스펙트 패턴 · 노드적 해석 적용할것\n\n'
+                  '음양 비율 · 4원소 분포 · 퀄리티 · 에센셜 디그니티 · 강조 ℎ · 핵심 어스펙트 패턴 · 노드적 해석 적용할것\n\n'
                   '⚠ AI 분석은 참고용 앵커입니다. 분석을 보고 난 후 실제 관찰과 비교하세요.',
                   style: TextStyle(
                     fontSize: 12,
