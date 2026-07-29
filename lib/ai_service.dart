@@ -231,6 +231,7 @@ $complaint
 
       if (response.statusCode == 200) {
         final json = jsonDecode(responseBody) as Map<String, dynamic>;
+        String rawText = '';
 
         if (isGemini) {
           final candidates = json['candidates'] as List<dynamic>?;
@@ -238,14 +239,27 @@ $complaint
             final content = candidates[0]['content'] as Map<String, dynamic>;
             final parts = content['parts'] as List<dynamic>;
             if (parts.isNotEmpty) {
-              return parts[0]['text'] as String;
+              rawText = parts[0]['text'] as String;
             }
           }
         } else {
           final choices = json['choices'] as List<dynamic>?;
           if (choices != null && choices.isNotEmpty) {
-            return choices[0]['message']['content'] as String;
+            rawText = choices[0]['message']['content'] as String;
           }
+        }
+
+        if (rawText.isNotEmpty) {
+          // Post-process to ensure all variations of house/h/하우스/집 are unified to 'ℎ'
+          rawText = rawText.replaceAll('하우스', 'ℎ');
+          rawText = rawText.replaceAllMapped(
+            RegExp(
+              r'\b(\d+)(?:st|nd|rd|th)?\s*(?:번째\s*집|번째\s*하우스|번\s*하우스|house|h)\b',
+              caseSensitive: false,
+            ),
+            (match) => '${match.group(1)}ℎ',
+          );
+          return rawText;
         }
         throw Exception('AI 응답 결과가 비어 있습니다.');
       } else {

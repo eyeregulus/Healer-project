@@ -66,13 +66,13 @@ class _HomeScreenState extends State<HomeScreen> {
     for (final p in placements) {
       if (p.startsWith('Sun in ')) {
         final sign = p.replaceFirst('Sun in ', '');
-        sun = AstrologyService.zodiacKorean[sign] ?? sign;
+        sun = AstrologyService.zodiacSymbol[sign] ?? sign;
       } else if (p.startsWith('Moon in ')) {
         final sign = p.replaceFirst('Moon in ', '');
-        moon = AstrologyService.zodiacKorean[sign] ?? sign;
+        moon = AstrologyService.zodiacSymbol[sign] ?? sign;
       } else if (p.startsWith('Ascendant in ')) {
         final sign = p.replaceFirst('Ascendant in ', '');
-        asc = AstrologyService.zodiacKorean[sign] ?? sign;
+        asc = AstrologyService.zodiacSymbol[sign] ?? sign;
       }
     }
     return {'Sun': sun, 'Moon': moon, 'Asc': asc};
@@ -341,26 +341,40 @@ class _HomeScreenState extends State<HomeScreen> {
                                       const SizedBox(height: 8),
 
                                       // Sign Badges
-                                      Wrap(
-                                        spacing: 6,
-                                        runSpacing: 4,
-                                        children: [
-                                          if (signs['Sun']!.isNotEmpty)
-                                            _buildSignBadge(
-                                              '☀️ ${signs['Sun']}',
-                                              const Color(0xFFE57373),
-                                            ),
-                                          if (signs['Moon']!.isNotEmpty)
-                                            _buildSignBadge(
-                                              '🌙 ${signs['Moon']}',
-                                              const Color(0xFF81C784),
-                                            ),
-                                          if (signs['Asc']!.isNotEmpty)
-                                            _buildSignBadge(
-                                              '상승: ${signs['Asc']}',
-                                              const Color(0xFF64B5F6),
-                                            ),
-                                        ],
+                                      Text.rich(
+                                        TextSpan(
+                                          children: [
+                                            if (signs['Asc']!.isNotEmpty) ...[
+                                              TextSpan(
+                                                text: 'ASC ${signs['Asc']}',
+                                                style: const TextStyle(
+                                                  color: Color(0xFF64B5F6),
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              const TextSpan(text: '   '),
+                                            ],
+                                            if (signs['Sun']!.isNotEmpty) ...[
+                                              TextSpan(
+                                                text: '☉ ${signs['Sun']}',
+                                                style: const TextStyle(
+                                                  color: Color(0xFFE57373),
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              const TextSpan(text: '   '),
+                                            ],
+                                            if (signs['Moon']!.isNotEmpty)
+                                              TextSpan(
+                                                text: '☽ ${signs['Moon']}',
+                                                style: const TextStyle(
+                                                  color: Color(0xFF81C784),
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        style: const TextStyle(fontSize: 13),
                                       ),
                                     ],
                                   ),
@@ -458,28 +472,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: AdWidget(ad: _bannerAd!),
               )
               : null,
-    );
-  }
-
-  Widget _buildSignBadge(String text, Color elementColor) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: elementColor.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: elementColor.withValues(alpha: 0.3),
-          width: 0.8,
-        ),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: elementColor,
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
     );
   }
 }

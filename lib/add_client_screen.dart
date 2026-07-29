@@ -216,6 +216,8 @@ class _AddClientScreenState extends State<AddClientScreen> {
               _buildInputContainer(
                 child: TextFormField(
                   controller: _nameController,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => _yearFocusNode.requestFocus(),
                   decoration: const InputDecoration(
                     labelText: '내담자 이름 (식별용)',
                     labelStyle: TextStyle(color: Themes.gold),

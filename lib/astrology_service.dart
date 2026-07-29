@@ -510,14 +510,25 @@ class AstrologyService {
       final planet = placement.split(' ')[0];
       return '${planetSymbol[planet] ?? planet} ℞';
     }
-    if (placement.contains(' House')) {
-      final parts = placement.split(' in ');
-      final planet = parts[0];
-      final house = parts[1].replaceFirst(' House', '');
-      return '${planetSymbol[planet] ?? planet} ${house}ℎ';
+    if (placement.toLowerCase().contains('house')) {
+      if (placement.toLowerCase().contains(' in ')) {
+        final parts = placement.split(RegExp(r'\s+in\s+', caseSensitive: false));
+        final left = parts[0];
+        final right = parts[1];
+        
+        if (right.toLowerCase().contains('house')) {
+          final planet = left;
+          final house = right.replaceAll(RegExp(r'(?:st|nd|rd|th)?\s*house', caseSensitive: false), '').trim();
+          return '${planetSymbol[planet] ?? planet} ${house}ℎ';
+        } else {
+          final house = left.replaceAll(RegExp(r'(?:st|nd|rd|th)?\s*house', caseSensitive: false), '').trim();
+          final sign = right;
+          return '${house}ℎ ${zodiacSymbol[sign] ?? sign}';
+        }
+      }
     }
-    if (placement.contains(' in ')) {
-      final parts = placement.split(' in ');
+    if (placement.toLowerCase().contains(' in ')) {
+      final parts = placement.split(RegExp(r'\s+in\s+', caseSensitive: false));
       final planet = parts[0];
       final sign = parts[1];
       return '${planetSymbol[planet] ?? planet} ${zodiacSymbol[sign] ?? sign}';

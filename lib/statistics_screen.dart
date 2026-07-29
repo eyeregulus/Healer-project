@@ -415,8 +415,8 @@ class _StatisticsScreenState extends State<StatisticsScreen>
 
         String sun = '', asc = '';
         for (final p in c.placements) {
-          if (p.startsWith('Sun in ')) sun = AstrologyService.zodiacKorean[p.replaceFirst('Sun in ', '')] ?? '';
-          if (p.startsWith('Ascendant in ')) asc = AstrologyService.zodiacKorean[p.replaceFirst('Ascendant in ', '')] ?? '';
+          if (p.startsWith('Sun in ')) sun = AstrologyService.zodiacSymbol[p.replaceFirst('Sun in ', '')] ?? '';
+          if (p.startsWith('Ascendant in ')) asc = AstrologyService.zodiacSymbol[p.replaceFirst('Ascendant in ', '')] ?? '';
         }
 
         Color matchColor = Colors.grey;
@@ -463,7 +463,7 @@ class _StatisticsScreenState extends State<StatisticsScreen>
                             Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                             if (result.needsReview) ...[const SizedBox(width: 6), const Icon(Icons.flag_rounded, color: Colors.orangeAccent, size: 14)],
                           ]),
-                          Text('☀️ $sun  상승: $asc', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                          Text('ASC $asc  ☉ $sun', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                         ],
                       ),
                     ),
@@ -672,9 +672,9 @@ class _StatisticsScreenState extends State<StatisticsScreen>
         String sun = '', asc = '';
         for (final p in c.placements) {
           if (p.startsWith('Sun in ')) {
-            sun = AstrologyService.zodiacKorean[p.replaceFirst('Sun in ', '')] ?? '';
+            sun = AstrologyService.zodiacSymbol[p.replaceFirst('Sun in ', '')] ?? '';
           } else if (p.startsWith('Ascendant in ')) {
-            asc = AstrologyService.zodiacKorean[p.replaceFirst('Ascendant in ', '')] ?? '';
+            asc = AstrologyService.zodiacSymbol[p.replaceFirst('Ascendant in ', '')] ?? '';
           }
         }
 
@@ -753,7 +753,7 @@ class _StatisticsScreenState extends State<StatisticsScreen>
                             ],
                           ),
                           Text(
-                            '☀️ $sun  상승: $asc',
+                            'ASC $asc  ☉ $sun',
                             style: const TextStyle(
                                 fontSize: 12, color: Colors.grey),
                           ),
