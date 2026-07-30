@@ -57,25 +57,70 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  Widget _buildHomeBadge(BuildContext context, String text, Color color) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDark ? color.withValues(alpha: 0.12) : color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: color.withValues(alpha: 0.35),
+          width: 1.0,
+        ),
+      ),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 11,
+          color: color,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
   // Extract Sun, Moon, and Ascendant signs from placements
   Map<String, String> _getCoreSigns(List<String> placements) {
-    String sun = '';
-    String moon = '';
+    String sunSign = '';
+    String sunHouse = '';
+    String moonSign = '';
+    String moonHouse = '';
     String asc = '';
 
     for (final p in placements) {
       if (p.startsWith('Sun in ')) {
-        final sign = p.replaceFirst('Sun in ', '');
-        sun = AstrologyService.zodiacSymbol[sign] ?? sign;
+        if (p.toLowerCase().contains('house')) {
+          final match = RegExp(r'\d+').firstMatch(p);
+          if (match != null) sunHouse = '${match.group(0)}ℎ';
+        } else {
+          final sign = p.replaceFirst('Sun in ', '');
+          sunSign = AstrologyService.zodiacSymbol[sign] ?? sign;
+        }
       } else if (p.startsWith('Moon in ')) {
-        final sign = p.replaceFirst('Moon in ', '');
-        moon = AstrologyService.zodiacSymbol[sign] ?? sign;
-      } else if (p.startsWith('Ascendant in ')) {
+        if (p.toLowerCase().contains('house')) {
+          final match = RegExp(r'\d+').firstMatch(p);
+          if (match != null) moonHouse = '${match.group(0)}ℎ';
+        } else {
+          final sign = p.replaceFirst('Moon in ', '');
+          moonSign = AstrologyService.zodiacSymbol[sign] ?? sign;
+        }
+      } else if (p.startsWith('Ascendant in ') && !p.toLowerCase().contains('house')) {
         final sign = p.replaceFirst('Ascendant in ', '');
         asc = AstrologyService.zodiacSymbol[sign] ?? sign;
       }
     }
-    return {'Sun': sun, 'Moon': moon, 'Asc': asc};
+
+    final sunDisplay = sunSign.isNotEmpty
+        ? (sunHouse.isNotEmpty ? '$sunSign $sunHouse' : sunSign)
+        : '';
+    final moonDisplay = moonSign.isNotEmpty
+        ? (moonHouse.isNotEmpty ? '$moonSign $moonHouse' : moonSign)
+        : '';
+
+    return {'Sun': sunDisplay, 'Moon': moonDisplay, 'Asc': asc};
   }
 
   Future<void> _deleteClient(Client client) async {
@@ -265,9 +310,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: Themes.gold.withValues(alpha: 0.15),
+                          color: Themes.gold.withValues(alpha: 0.18),
                         ),
-                        boxShadow: [Themes.cardShadow(true)],
+                        boxShadow: [
+                          Themes.cardShadow(
+                            Theme.of(context).brightness == Brightness.dark,
+                          ),
+                        ],
                       ),
                       child: Material(
                         color: Colors.transparent,
@@ -341,40 +390,35 @@ class _HomeScreenState extends State<HomeScreen> {
                                       const SizedBox(height: 8),
 
                                       // Sign Badges
-                                      Text.rich(
-                                        TextSpan(
+                                      FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: Row(
                                           children: [
                                             if (signs['Asc']!.isNotEmpty) ...[
-                                              TextSpan(
-                                                text: 'ASC ${signs['Asc']}',
-                                                style: const TextStyle(
-                                                  color: Color(0xFF64B5F6),
-                                                  fontWeight: FontWeight.bold,
-                                                ),
+                                              _buildHomeBadge(
+                                                context,
+                                                'ASC ${signs['Asc']}',
+                                                const Color(0xFF64B5F6),
                                               ),
-                                              const TextSpan(text: '   '),
+                                              const SizedBox(width: 5),
                                             ],
                                             if (signs['Sun']!.isNotEmpty) ...[
-                                              TextSpan(
-                                                text: '☉ ${signs['Sun']}',
-                                                style: const TextStyle(
-                                                  color: Color(0xFFE57373),
-                                                  fontWeight: FontWeight.bold,
-                                                ),
+                                              _buildHomeBadge(
+                                                context,
+                                                '☉\uFE0E ${signs['Sun']}',
+                                                const Color(0xFFE57373),
                                               ),
-                                              const TextSpan(text: '   '),
+                                              const SizedBox(width: 5),
                                             ],
                                             if (signs['Moon']!.isNotEmpty)
-                                              TextSpan(
-                                                text: '☽ ${signs['Moon']}',
-                                                style: const TextStyle(
-                                                  color: Color(0xFF81C784),
-                                                  fontWeight: FontWeight.bold,
-                                                ),
+                                              _buildHomeBadge(
+                                                context,
+                                                '☽\uFE0E ${signs['Moon']}',
+                                                const Color(0xFF81C784),
                                               ),
                                           ],
                                         ),
-                                        style: const TextStyle(fontSize: 13),
                                       ),
                                     ],
                                   ),

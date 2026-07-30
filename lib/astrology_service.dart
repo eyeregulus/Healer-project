@@ -415,8 +415,8 @@ class AstrologyService {
 
   // ── 행성 기호 (화면 표시용) ──────────────────────────────────────────────
   static const Map<String, String> planetSymbol = {
-    'Sun': '☉',
-    'Moon': '☽',
+    'Sun': '☉\uFE0E',
+    'Moon': '☽\uFE0E',
     'Mercury': '☿',
     'Venus': '♀',
     'Mars': '♂',
@@ -525,6 +525,9 @@ class AstrologyService {
           final sign = right;
           return '${house}ℎ ${zodiacSymbol[sign] ?? sign}';
         }
+      } else {
+        final house = placement.replaceAll(RegExp(r'(?:st|nd|rd|th)?\s*house', caseSensitive: false), '').trim();
+        return '${house}ℎ';
       }
     }
     if (placement.toLowerCase().contains(' in ')) {

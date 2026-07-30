@@ -165,9 +165,6 @@ $complaint
       '-',
     );
 
-    if (modelNameSanitized.contains('gemini-1.5')) {
-      modelNameSanitized = 'gemini-2.5-flash';
-    }
 
     Uri uri;
     Map<String, String> headers;
@@ -251,20 +248,34 @@ $complaint
 
         if (rawText.isNotEmpty) {
           // Post-process to ensure all variations of house/h/하우스/집 are unified to 'ℎ'
-          rawText = rawText.replaceAll('하우스', 'ℎ');
           rawText = rawText.replaceAllMapped(
             RegExp(
-              r'\b(\d+)(?:st|nd|rd|th)?\s*(?:번째\s*집|번째\s*하우스|번\s*하우스|house|h)\b',
+              r'(\d+)(?:st|nd|rd|th)?\s*(?:번째\s*집|번째\s*하우스|번\s*하우스|하우스|집|house\b|h\b)',
               caseSensitive: false,
             ),
             (match) => '${match.group(1)}ℎ',
           );
+          rawText = rawText.replaceAll('하우스', 'ℎ');
+          rawText = rawText.replaceAll(RegExp(r'\bhouse\b', caseSensitive: false), 'ℎ');
+
+          // Standardize astrological symbols from emoji-like characters to standard Unicode symbols (☉, ☽)
+          rawText = rawText.replaceAll('☀️', '☉');
+          rawText = rawText.replaceAll('🌞', '☉');
+          rawText = rawText.replaceAll('🌙', '☽');
+          rawText = rawText.replaceAll('🌕', '☽');
+          rawText = rawText.replaceAll('🌒', '☽');
+          rawText = rawText.replaceAll('🌗', '☽');
+          rawText = rawText.replaceAll('🌑', '☽');
+          rawText = rawText.replaceAll('🪐', '♄');
           return rawText;
         }
         throw Exception('AI 응답 결과가 비어 있습니다.');
       } else {
+        final maskedKey = pref.apiKey.length > 8
+            ? '${pref.apiKey.substring(0, 4)}...${pref.apiKey.substring(pref.apiKey.length - 4)}'
+            : 'short_or_empty';
         throw Exception(
-          'AI 요청 실패 (HTTP ${response.statusCode}):\n$responseBody',
+          'AI 요청 실패 (HTTP ${response.statusCode})\n[Model: $modelNameSanitized]\n[Key: $maskedKey]\n$responseBody',
         );
       }
     } catch (e) {

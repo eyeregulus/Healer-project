@@ -360,6 +360,31 @@ class _StatisticsScreenState extends State<StatisticsScreen>
     );
   }
 
+  Widget _buildHomeBadge(BuildContext context, String text, Color color) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDark ? color.withValues(alpha: 0.12) : color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: color.withValues(alpha: 0.35),
+          width: 1.0,
+        ),
+      ),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 11,
+          color: color,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
   Widget _buildAspectList() {
     // 어스펙트를 타입별로 분류해서 보여주기 (Square/Opposition 먼저)
     final tenseIndices = _filteredAspectIndices
@@ -413,11 +438,23 @@ class _StatisticsScreenState extends State<StatisticsScreen>
         final result = _aspectResults[index];
         final c = result.client;
 
-        String sun = '', asc = '';
+        String sunSign = '', sunHouse = '', asc = '';
         for (final p in c.placements) {
-          if (p.startsWith('Sun in ')) sun = AstrologyService.zodiacSymbol[p.replaceFirst('Sun in ', '')] ?? '';
-          if (p.startsWith('Ascendant in ')) asc = AstrologyService.zodiacSymbol[p.replaceFirst('Ascendant in ', '')] ?? '';
+          if (p.startsWith('Sun in ')) {
+            if (p.toLowerCase().contains('house')) {
+              final match = RegExp(r'\d+').firstMatch(p);
+              if (match != null) sunHouse = '${match.group(0)}ℎ';
+            } else {
+              sunSign = AstrologyService.zodiacSymbol[p.replaceFirst('Sun in ', '')] ?? '';
+            }
+          }
+          if (p.startsWith('Ascendant in ') && !p.toLowerCase().contains('house')) {
+            asc = AstrologyService.zodiacSymbol[p.replaceFirst('Ascendant in ', '')] ?? '';
+          }
         }
+        final sun = sunSign.isNotEmpty
+            ? (sunHouse.isNotEmpty ? '$sunSign $sunHouse' : sunSign)
+            : '';
 
         Color matchColor = Colors.grey;
         String matchLabel = '미기록';
@@ -463,7 +500,29 @@ class _StatisticsScreenState extends State<StatisticsScreen>
                             Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                             if (result.needsReview) ...[const SizedBox(width: 6), const Icon(Icons.flag_rounded, color: Colors.orangeAccent, size: 14)],
                           ]),
-                          Text('ASC $asc  ☉ $sun', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                           const SizedBox(height: 4),
+                           FittedBox(
+                             fit: BoxFit.scaleDown,
+                             alignment: Alignment.centerLeft,
+                             child: Row(
+                               children: [
+                                 if (asc.isNotEmpty) ...[
+                                   _buildHomeBadge(
+                                     context,
+                                     'ASC $asc',
+                                     const Color(0xFF64B5F6),
+                                   ),
+                                   const SizedBox(width: 5),
+                                 ],
+                                 if (sun.isNotEmpty)
+                                   _buildHomeBadge(
+                                     context,
+                                     '☉\uFE0E $sun',
+                                     const Color(0xFFE57373),
+                                   ),
+                               ],
+                             ),
+                           ),
                         ],
                       ),
                     ),
@@ -669,14 +728,22 @@ class _StatisticsScreenState extends State<StatisticsScreen>
         final c = result.client;
 
         // Sun / Asc 사인
-        String sun = '', asc = '';
+        String sunSign = '', sunHouse = '', asc = '';
         for (final p in c.placements) {
           if (p.startsWith('Sun in ')) {
-            sun = AstrologyService.zodiacSymbol[p.replaceFirst('Sun in ', '')] ?? '';
-          } else if (p.startsWith('Ascendant in ')) {
+            if (p.toLowerCase().contains('house')) {
+              final match = RegExp(r'\d+').firstMatch(p);
+              if (match != null) sunHouse = '${match.group(0)}ℎ';
+            } else {
+              sunSign = AstrologyService.zodiacSymbol[p.replaceFirst('Sun in ', '')] ?? '';
+            }
+          } else if (p.startsWith('Ascendant in ') && !p.toLowerCase().contains('house')) {
             asc = AstrologyService.zodiacSymbol[p.replaceFirst('Ascendant in ', '')] ?? '';
           }
         }
+        final sun = sunSign.isNotEmpty
+            ? (sunHouse.isNotEmpty ? '$sunSign $sunHouse' : sunSign)
+            : '';
 
         Color matchColor = Colors.grey;
         String matchLabel = '미기록';
@@ -752,11 +819,29 @@ class _StatisticsScreenState extends State<StatisticsScreen>
                               ],
                             ],
                           ),
-                          Text(
-                            'ASC $asc  ☉ $sun',
-                            style: const TextStyle(
-                                fontSize: 12, color: Colors.grey),
-                          ),
+                           const SizedBox(height: 4),
+                           FittedBox(
+                             fit: BoxFit.scaleDown,
+                             alignment: Alignment.centerLeft,
+                             child: Row(
+                               children: [
+                                 if (asc.isNotEmpty) ...[
+                                   _buildHomeBadge(
+                                     context,
+                                     'ASC $asc',
+                                     const Color(0xFF64B5F6),
+                                   ),
+                                   const SizedBox(width: 5),
+                                 ],
+                                 if (sun.isNotEmpty)
+                                   _buildHomeBadge(
+                                     context,
+                                     '☉\uFE0E $sun',
+                                     const Color(0xFFE57373),
+                                   ),
+                               ],
+                             ),
+                           ),
                         ],
                       ),
                     ),

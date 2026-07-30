@@ -425,7 +425,7 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
     final housePlacements = <String>[];
 
     for (final p in _client!.placements) {
-      if (p.contains('House')) {
+      if (p.toLowerCase().contains('house')) {
         housePlacements.add(AstrologyService.translatePlacement(p));
       } else {
         planetPlacements.add(AstrologyService.translatePlacement(p));
@@ -446,6 +446,36 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
     );
     final longitudes = natalData['longitudes'] as Map<String, double>;
     final cusps = natalData['cusps'] as List<double>;
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    Widget buildSectionCard({
+      required String title,
+      required IconData icon,
+      required Widget content,
+    }) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: Themes.gold.withValues(alpha: 0.15),
+            width: 1.0,
+          ),
+          boxShadow: [Themes.cardShadow(isDark)],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSectionHeader(title, icon),
+            const SizedBox(height: 12),
+            content,
+          ],
+        ),
+      );
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
@@ -490,62 +520,73 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
           }(),
           const SizedBox(height: 24),
 
-          _buildSectionHeader('행성 위치 및 사인', Icons.wb_sunny_rounded),
-          const SizedBox(height: 8),
-          _buildChipsWrap(planetPlacements),
-          const SizedBox(height: 20),
+          buildSectionCard(
+            title: '행성 위치 및 사인',
+            icon: Icons.wb_sunny_rounded,
+            content: _buildChipsWrap(planetPlacements),
+          ),
+          const SizedBox(height: 24),
 
-          _buildSectionHeader('ℎ 배치', Icons.home_rounded),
-          const SizedBox(height: 8),
-          _buildChipsWrap(housePlacements),
-          const SizedBox(height: 20),
+          buildSectionCard(
+            title: '하우스 배치',
+            icon: Icons.home_rounded,
+            content: _buildChipsWrap(housePlacements),
+          ),
+          const SizedBox(height: 24),
 
-          _buildSectionHeader('격각', Icons.hub_rounded),
-          const SizedBox(height: 8),
-          if (aspectsTranslated.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 8),
-              child: Text(
-                '감지된 주요 각도가 없습니다.',
-                style: TextStyle(color: Colors.grey),
-              ),
-            )
-          else
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children:
-                  aspectsTranslated.map((a) {
-                    final isTense = a.contains('□') || a.contains('☍');
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color:
-                            isTense
-                                ? Colors.redAccent.withValues(alpha: 0.08)
-                                : Themes.gold.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color:
-                              isTense
-                                  ? Colors.redAccent.withValues(alpha: 0.35)
-                                  : Themes.gold.withValues(alpha: 0.3),
-                        ),
-                      ),
+          buildSectionCard(
+            title: '어스펙트',
+            icon: Icons.hub_rounded,
+            content:
+                aspectsTranslated.isEmpty
+                    ? const Padding(
+                      padding: EdgeInsets.only(bottom: 8),
                       child: Text(
-                        a,
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: isTense ? Colors.redAccent : Themes.gold,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        '감지된 주요 각도가 없습니다.',
+                        style: TextStyle(color: Colors.grey),
                       ),
-                    );
-                  }).toList(),
-            ),
+                    )
+                    : Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children:
+                          aspectsTranslated.map((a) {
+                            final isTense = a.contains('□') || a.contains('☍');
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color:
+                                    isTense
+                                        ? Colors.redAccent.withValues(
+                                          alpha: 0.08,
+                                        )
+                                        : Themes.gold.withValues(alpha: 0.06),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color:
+                                      isTense
+                                          ? Colors.redAccent.withValues(
+                                            alpha: 0.35,
+                                          )
+                                          : Themes.gold.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Text(
+                                a,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  color:
+                                      isTense ? Colors.redAccent : Themes.gold,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                    ),
+          ),
           const SizedBox(height: 28),
         ],
       ),
@@ -1002,7 +1043,8 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
         final createdStr =
             '${consultation.createdAt.year}년 ${consultation.createdAt.month}월 ${consultation.createdAt.day}일';
 
-        final isTransit = consultation.aiOpinion.startsWith('[실시간 트랜짓') ||
+        final isTransit =
+            consultation.aiOpinion.startsWith('[실시간 트랜짓') ||
             consultation.aiOpinion.startsWith('[T');
 
         return Container(
@@ -1022,11 +1064,15 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
               title: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
-                      color: isTransit
-                          ? Colors.purple.withValues(alpha: 0.15)
-                          : Themes.gold.withValues(alpha: 0.15),
+                      color:
+                          isTransit
+                              ? Colors.purple.withValues(alpha: 0.15)
+                              : Themes.gold.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
                         color: isTransit ? Colors.purple : Themes.gold,
