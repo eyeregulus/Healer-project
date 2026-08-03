@@ -277,6 +277,16 @@ $complaint
           rawText = rawText.replaceAll('🌗', '☽');
           rawText = rawText.replaceAll('🌑', '☽');
           rawText = rawText.replaceAll('🪐', '♄');
+
+          // Enforce Terminology
+          rawText = rawText.replaceAll(RegExp(r'\bTransit\b', caseSensitive: false), 'T');
+          rawText = rawText.replaceAll('트랜짓', 'T');
+          rawText = rawText.replaceAll(RegExp(r'\bNatal\b', caseSensitive: false), 'N');
+          rawText = rawText.replaceAll('네이탈', 'N');
+          rawText = rawText.replaceAll(RegExp(r'\bAscendant\b', caseSensitive: false), 'ASC');
+          rawText = rawText.replaceAll('어센던트', 'ASC');
+          rawText = rawText.replaceAll('어센', 'ASC');
+
           return rawText;
         }
         throw Exception('AI 응답 결과가 비어 있습니다.');
@@ -328,7 +338,8 @@ $complaint
 [필수 표기 규칙]
 1. 모든 행성, 사인, 어스펙트는 한글 텍스트 대신 반드시 기호(☉, ☽, ☿, ♀, ♂, ♃, ♄, ♅, ♆, ♇, ☊, ☋, ⚷, ⚵, ⚸, ⚶, ⚴, ⚳, ⨂, ♈, ♉, ♊, ♋, ♌, ♍, ♎, ♏, ♐, ♑, ♒, ♓, ☌, ✶, □, △, ☍)로만 표기하세요.
 2. 4원소를 표기할 때는 반드시 한자(火, 土, 空, 水)를 사용하세요.
-3. 결과를 출력할 때 불필요한 서론이나 맺음말을 생략하고, 바로 본론으로 시작하여 간결하게 작성하세요.
+3. 'Transit'은 'T'로, 'Natal'은 'N'으로, 'Ascendant'는 'ASC'로 표기하세요.
+4. 결과를 출력할 때 불필요한 서론이나 맺음말을 생략하고, 바로 본론으로 시작하여 간결하게 작성하세요.
 
 마지막에는 이 상담과 관련된 임상 키워드(태그)를 컴마로 구분해 주세요.
 예: Tags: #직장갈등, #토성_성장통, #화성_행동력
@@ -411,6 +422,7 @@ $timeConstraintRule
 [기호 사용 규칙]
 1. 모든 행성과 사인, 어스펙트는 한글 텍스트 대신 반드시 기호(☉, ☽, ☿, ♀, ♂, ♃, ♄, ♅, ♆, ♇, ☊, ☋, ⚷, ⚵, ⚸, ⚶, ⚴, ⚳, ⨂, ♈, ♉, ♊, ♋, ♌, ♍, ♎, ♏, ♐, ♑, ♒, ♓, ☌, ✶, □, △, ☍)로 표기할 것.
 2. 에센셜 디그니티 규칙(Domicile, Exaltation, Detriment, Fall)을 정통 점성학 규칙에 맞추어 지배 행성의 힘과 캐릭터 상태를 판단하세요.
+3. 'Transit'은 'T'로, 'Natal'은 'N'으로, 'Ascendant'는 'ASC'로 표기할 것.
 ''';
 
     return await _callApi(
@@ -442,7 +454,8 @@ $timeConstraintRule
 1. 이전 분석 결과와의 일관성을 유지하며 전문적이고 친절하게 답변할 것.
 2. 모든 행성, 사인, 어스펙트는 한글 텍스트 대신 반드시 기호(☉, ☽, ☿, ♀, ♂, ♃, ♄, ♅, ♆, ♇, ☊, ☋, ⚷, ⚵, ⚸, ⚶, ⚴, ⚳, ⨂, ♈, ♉, ♊, ♋, ♌, ♍, ♎, ♏, ♐, ♑, ♒, ♓, ☌, ✶, □, △, ☍)로 표기할 것.
 3. 4원소는 한자(火, 土, 空, 水)로 표기하고, 하우스는 'ℎ'로 표기할 것.
-${isTimeUnknown ? '4. 출생 시간을 모르는 내담자이므로, ℎ(하우스 영역) 및 ASC/MC 관련 포지션 언급은 피하세요.' : ''}
+4. 'Transit'은 'T'로, 'Natal'은 'N'으로, 'Ascendant'는 'ASC'로 표기할 것.
+${isTimeUnknown ? '5. 출생 시간을 모르는 내담자이므로, ℎ(하우스 영역) 및 ASC/MC 관련 포지션 언급은 피하세요.' : ''}
 ''';
 
     final userContent = '''
