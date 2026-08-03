@@ -123,7 +123,7 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
     });
 
     try {
-      final isUnknown = _client!.birthTime == 'Unknown';
+      final isUnknown = _client!.birthTime == '❓';
       List<String> filteredPlacements = _client!.placements;
 
       if (isUnknown) {
@@ -421,13 +421,21 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
   // ─── Tab 1: 네이탈 차트 ───────────────────────────────────────────────────
 
   Widget _buildChartTab() {
+    final isUnknown =
+        _client!.birthTime == '❓' || !_client!.birthTime.contains(':');
     final planetPlacements = <String>[];
     final housePlacements = <String>[];
 
     for (final p in _client!.placements) {
       if (p.toLowerCase().contains('house')) {
-        housePlacements.add(AstrologyService.translatePlacement(p));
+        if (!isUnknown) {
+          housePlacements.add(AstrologyService.translatePlacement(p));
+        }
       } else {
+        if (isUnknown &&
+            (p.startsWith('Ascendant in ') || p.startsWith('MC in '))) {
+          continue;
+        }
         planetPlacements.add(AstrologyService.translatePlacement(p));
       }
     }
@@ -527,12 +535,14 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
           ),
           const SizedBox(height: 24),
 
-          buildSectionCard(
-            title: '하우스 배치',
-            icon: Icons.home_rounded,
-            content: _buildChipsWrap(housePlacements),
-          ),
-          const SizedBox(height: 24),
+          if (!isUnknown) ...[
+            buildSectionCard(
+              title: '하우스 배치',
+              icon: Icons.home_rounded,
+              content: _buildChipsWrap(housePlacements),
+            ),
+            const SizedBox(height: 24),
+          ],
 
           buildSectionCard(
             title: '어스펙트',
@@ -1305,7 +1315,10 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            '${_client!.birthDate.year}.${_client!.birthDate.month}.${_client!.birthDate.day} (${_client!.birthTime})',
+                            _client!.birthTime == '❓' ||
+                                    !_client!.birthTime.contains(':')
+                                ? '${_client!.birthDate.year}.${_client!.birthDate.month}.${_client!.birthDate.day} [❓]'
+                                : '${_client!.birthDate.year}.${_client!.birthDate.month}.${_client!.birthDate.day} (${_client!.birthTime})',
                             style: const TextStyle(
                               fontSize: 11,
                               color: Colors.grey,

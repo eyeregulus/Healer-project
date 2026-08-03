@@ -361,6 +361,54 @@ $complaint
     }
     return tags;
   }
+
+  /// 범용 AI 프롬프트 분석 실행 (관계/궁합 및 네이탈 전용)
+  static Future<String> generateAnalysis(
+    String prompt, {
+    bool isTimeUnknown = false,
+  }) async {
+    final pref = await DatabaseService.isar.preferences.get(0) ?? Preference();
+
+    if (pref.apiKey.isEmpty &&
+        !pref.customEndpoint.contains('localhost') &&
+        !pref.customEndpoint.contains('127.0.0.1')) {
+      throw Exception('API Key가 설정되어 있지 않습니다. 설정 화면에서 API Key를 등록해 주세요.');
+    }
+
+    final String timeConstraintRule =
+        isTimeUnknown
+            ? '''
+[출생 시간 미상 분석 규칙 - 필수]
+- 한 명 이상의 내담자가 출생 시간을 모릅니다.
+- 따라서 ℎ(하우스 영역) 및 ASC/MC/지배 ℎ 포지션 분석은 완전히 제외하세요.
+- 대신 다음 요소에 집중하여 캐릭터와 에너지를 해석하세요:
+  1. 사인(Zodiac Sign) 중심 캐릭터 및 심리적/성향적 특성
+  2. 행성(Planets) 고유의 본질적 에너지와 에센셜 디그니티 (Domicile/Exaltation/Detriment/Fall)
+  3. 행성의 룰러(지배 행성)의 상태와 디그니티 강약
+  4. 행성 간 어스펙트(Aspects) 상호작용 및 에너지 교환 (달 어스펙트는 가능성으로 부드럽게 제시)
+'''
+            : '''
+[출생 시간 유효 분석 규칙]
+- 하우스(ℎ), 포지션, 룰러십 영역 및 행성 어스펙트, 에센셜 디그니티를 입체적으로 통합하여 분석하세요.
+''';
+
+    final systemPrompt = '''
+당신은 전통 및 현대 점성학을 깊이 있게 연구한 동양/서양 통합 점성가이자 심리치료사입니다.
+제공된 점성학 데이터(시나스트리/컴포짓/네이탈)를 바탕으로 두 사람의 관계, 대화 흥미, 에너지 교환, 성격/캐릭터 특성을 친절하고 통찰력 있게 분석하세요.
+
+$timeConstraintRule
+
+[기호 사용 규칙]
+1. 모든 행성과 사인, 어스펙트는 한글 텍스트 대신 반드시 기호(☉, ☽, ☿, ♀, ♂, ♃, ♄, ♅, ♆, ♇, ♈, ♉, ♊, ♋, ♌, ♍, ♎, ♏, ♐, ♑, ♒, ♓, ☌, ✶, □, △, ☍)로 표기할 것.
+2. 에센셜 디그니티 규칙(Domicile, Exaltation, Detriment, Fall)을 정통 점성학 규칙에 맞추어 지배 행성의 힘과 캐릭터 상태를 판단하세요.
+''';
+
+    return await _callApi(
+      systemPrompt: systemPrompt,
+      userContent: prompt,
+      pref: pref,
+    );
+  }
 }
 
 class AiAnalysisResult {

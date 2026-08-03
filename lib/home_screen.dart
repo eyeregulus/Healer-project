@@ -62,12 +62,12 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: isDark ? color.withValues(alpha: 0.12) : color.withValues(alpha: 0.08),
+        color:
+            isDark
+                ? color.withValues(alpha: 0.12)
+                : color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: color.withValues(alpha: 0.35),
-          width: 1.0,
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.35), width: 1.0),
       ),
       child: Text(
         text,
@@ -107,18 +107,21 @@ class _HomeScreenState extends State<HomeScreen> {
           final sign = p.replaceFirst('Moon in ', '');
           moonSign = AstrologyService.zodiacSymbol[sign] ?? sign;
         }
-      } else if (p.startsWith('Ascendant in ') && !p.toLowerCase().contains('house')) {
+      } else if (p.startsWith('Ascendant in ') &&
+          !p.toLowerCase().contains('house')) {
         final sign = p.replaceFirst('Ascendant in ', '');
         asc = AstrologyService.zodiacSymbol[sign] ?? sign;
       }
     }
 
-    final sunDisplay = sunSign.isNotEmpty
-        ? (sunHouse.isNotEmpty ? '$sunSign $sunHouse' : sunSign)
-        : '';
-    final moonDisplay = moonSign.isNotEmpty
-        ? (moonHouse.isNotEmpty ? '$moonSign $moonHouse' : moonSign)
-        : '';
+    final sunDisplay =
+        sunSign.isNotEmpty
+            ? (sunHouse.isNotEmpty ? '$sunSign $sunHouse' : sunSign)
+            : '';
+    final moonDisplay =
+        moonSign.isNotEmpty
+            ? (moonHouse.isNotEmpty ? '$moonSign $moonHouse' : moonSign)
+            : '';
 
     return {'Sun': sunDisplay, 'Moon': moonDisplay, 'Asc': asc};
   }
@@ -381,7 +384,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        '${client.birthDate.year}년 ${client.birthDate.month}월 ${client.birthDate.day}일 ${client.birthTime} (${client.birthPlace})',
+                                        (client.birthTime == '❓' ||
+                                                !client.birthTime.contains(':'))
+                                            ? '${client.birthDate.year}년 ${client.birthDate.month}월 ${client.birthDate.day}일 [❓] (${client.birthPlace})'
+                                            : '${client.birthDate.year}년 ${client.birthDate.month}월 ${client.birthDate.day}일 ${client.birthTime} (${client.birthPlace})',
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: textSecondaryColor,

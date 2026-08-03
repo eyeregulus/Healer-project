@@ -5,6 +5,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import 'package:basic/splash_screen.dart';
 import 'package:basic/home_screen.dart';
+import 'package:basic/relationship_screen.dart';
 import 'package:basic/settings_screen.dart';
 import 'package:basic/statistics_screen.dart';
 import 'package:basic/database_service.dart';
@@ -76,7 +77,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     // MaterialApp: 구글 Material Design 스타일의 앱을 만드는 틀입니다.
     return MaterialApp(
-      title: 'Healer Project', // 앱의 제목
+      title: 'Healer project', // 앱의 제목
       // 🎨 앱 전체의 색상 테마를 설정합니다.
       theme: Themes.lightTheme,
       darkTheme: Themes.darkTheme,
@@ -88,7 +89,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// ✅ 하단 탭바(홈·설정·정보)를 포함하는 메인 화면입니다.
+// ✅ 하단 탭바(홈·관계·통계·설정)를 포함하는 메인 화면입니다.
 // StatefulWidget = 상태(현재 선택된 탭)가 바뀔 수 있는 위젯이에요.
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -102,22 +103,19 @@ class MainScreen extends StatefulWidget {
 // 언더바(_)로 시작하면 이 파일 안에서만 쓸 수 있다는 뜻이에요. (비공개)
 class _MainScreenState extends State<MainScreen> {
   // 현재 몇 번째 탭이 선택되었는지 저장하는 변수입니다.
-  // 0 = 홈, 1 = 통계, 2 = 설정
+  // 0 = 홈, 1 = 관계/궁합, 2 = 통계, 3 = 설정
   int _selectedIndex = 0;
 
   // 탭마다 보여줄 화면 목록입니다.
-  // static const: 절대 바뀌지 않는 고정된 목록이에요.
   static const List<Widget> _widgetOptions = <Widget>[
     HomeScreen(title: '내담자 임상 기록'), // 0번: 홈 화면 (내담자 목록)
-    StatisticsScreen(), // 1번: 임상 통계 분석 화면
-    SettingsScreen(), // 2번: 설정 화면
+    RelationshipScreen(), // 1번: 관계 & 궁합 (시나스트리/컴포짓)
+    StatisticsScreen(), // 2번: 임상 통계 분석 화면
+    SettingsScreen(), // 3번: 설정 화면
   ];
 
   // 탭을 눌렀을 때 호출되는 함수입니다.
-  // index: 몇 번째 탭을 눌렀는지 번호가 전달돼요.
   void _onItemTapped(int index) {
-    // setState: 화면을 다시 그려달라고 Flutter에게 알리는 함수입니다.
-    // 이 안에서 변수를 바꿔야 화면이 업데이트돼요!
     setState(() {
       _selectedIndex = index; // 선택된 탭 번호를 업데이트
     });
@@ -127,15 +125,19 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       // 📄 현재 선택된 탭에 맞는 화면을 중앙에 보여줍니다.
-      // elementAt(_selectedIndex): 목록에서 _selectedIndex번째 항목을 꺼냅니다.
       body: Center(child: _widgetOptions.elementAt(_selectedIndex)),
 
       // 📍 화면 아래쪽에 탭 버튼들을 보여줍니다.
       bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
             icon: Icon(Icons.people_alt_rounded),
             label: '내담자',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite_rounded),
+            label: '관계 & 궁합',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.analytics_rounded),
@@ -152,3 +154,4 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 }
+

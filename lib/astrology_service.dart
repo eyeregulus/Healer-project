@@ -935,4 +935,144 @@ class AstrologyService {
 
     return activeTransits;
   }
+
+  /// Calculates Synastry aspects and house overlay between Person A and Person B.
+  static Map<String, dynamic> calculateSynastryData({
+    required Map<String, double> longitudesA,
+    required List<double> cuspsA,
+    required Map<String, double> longitudesB,
+    required List<double> cuspsB,
+  }) {
+    final synastryAspects = <String>[];
+    final majorBodies = [
+      'Sun', 'Moon', 'Mercury', 'Venus', 'Mars',
+      'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto',
+      'Ascendant', 'MC'
+    ];
+
+    // 1. Inter-aspects between Person A and Person B
+    for (final bA in majorBodies) {
+      final lonA = longitudesA[bA];
+      if (lonA == null) continue;
+      for (final bB in majorBodies) {
+        final lonB = longitudesB[bB];
+        if (lonB == null) continue;
+
+        final aspectName = getAspect(lonA, lonB);
+        if (aspectName != null) {
+          synastryAspects.add('$bA(A)-$bB(B)-$aspectName');
+        }
+      }
+    }
+
+    // 2. House overlays: Person A's planets in Person B's houses & Person B's planets in Person A's houses
+    final aInBHouses = <String, int>{};
+    final bInAHouses = <String, int>{};
+
+    for (final entry in longitudesA.entries) {
+      if (cuspsB.length >= 13) {
+        aInBHouses[entry.key] = getHouseForLongitude(entry.value, cuspsB);
+      }
+    }
+
+    for (final entry in longitudesB.entries) {
+      if (cuspsA.length >= 13) {
+        bInAHouses[entry.key] = getHouseForLongitude(entry.value, cuspsA);
+      }
+    }
+
+    return {
+      'synastryAspects': synastryAspects,
+      'personAInPersonBHouses': aInBHouses,
+      'personBInPersonAHouses': bInAHouses,
+    };
+  }
+
+  /// Calculates Composite midpoints between Person A and Person B longitudes and cusps.
+  static Map<String, dynamic> calculateCompositeData({
+    required Map<String, double> longitudesA,
+    required List<double> cuspsA,
+    required Map<String, double> longitudesB,
+    required List<double> cuspsB,
+  }) {
+    final compositeLongitudes = <String, double>{};
+    final keys = longitudesA.keys.where((k) => longitudesB.containsKey(k));
+
+    for (final key in keys) {
+      final lonA = longitudesA[key]!;
+      final lonB = longitudesB[key]!;
+      
+      // Calculate shortest arc midpoint
+      double diff = (lonA - lonB).abs();
+      double midpoint;
+      if (diff <= 180.0) {
+        midpoint = (lonA + lonB) / 2.0;
+      } else {
+        midpoint = ((lonA + lonB + 360.0) / 2.0) % 360.0;
+      }
+      compositeLongitudes[key] = midpoint;
+    }
+
+    // Midpoints for cusps (if available)
+    final compositeCusps = <double>[0.0]; // 1-indexed
+    if (cuspsA.length >= 13 && cuspsB.length >= 13) {
+      for (int h = 1; h <= 12; h++) {
+        final cA = cuspsA[h];
+        final cB = cuspsB[h];
+        double diff = (cA - cB).abs();
+        double mid;
+        if (diff <= 180.0) {
+          mid = (cA + cB) / 2.0;
+        } else {
+          mid = ((cA + cB + 360.0) / 2.0) % 360.0;
+        }
+        compositeCusps.add(mid);
+      }
+    }
+
+    // Composite Placements & Aspects
+    final placements = <String>[];
+    final aspects = <String>[];
+
+    for (final entry in compositeLongitudes.entries) {
+      final name = entry.key;
+      final lon = entry.value;
+      final sign = getZodiacSign(lon);
+      placements.add('$name in $sign');
+      if (compositeCusps.length >= 13) {
+        final house = getHouseForLongitude(lon, compositeCusps);
+        placements.add('$name in $house House');
+      }
+    }
+
+    final majorAspectBodies = [
+      'Sun', 'Moon', 'Mercury', 'Venus', 'Mars',
+      'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto',
+      'Ascendant', 'MC'
+    ];
+    final aspectList = compositeLongitudes.keys.where((k) => majorAspectBodies.contains(k)).toList();
+
+    for (int i = 0; i < aspectList.length; i++) {
+      for (int j = i + 1; j < aspectList.length; j++) {
+        final b1 = aspectList[i];
+        final b2 = aspectList[j];
+        final lon1 = compositeLongitudes[b1]!;
+        final lon2 = compositeLongitudes[b2]!;
+
+        final aspectName = getAspect(lon1, lon2);
+        if (aspectName != null) {
+          final sortedNames = [b1, b2]..sort();
+          aspects.add('${sortedNames[0]}-${sortedNames[1]}-$aspectName');
+        }
+      }
+    }
+
+    return {
+      'compositeLongitudes': compositeLongitudes,
+      'compositeCusps': compositeCusps,
+      'placements': placements,
+      'aspects': aspects,
+    };
+  }
 }
+

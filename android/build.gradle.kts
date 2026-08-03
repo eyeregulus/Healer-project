@@ -13,7 +13,7 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 
-// ✅ Fix: isar_flutter_libs 등 구버전 패키지의 AGP 8+ namespace 누락 문제 해결
+// ✅ Fix: isar_flutter_libs 등 구버전 패키지의 AGP 8+ namespace 누락 문제 및 Android 15 16KB ELF alignment 적용
 // MUST be before evaluationDependsOn(":app")
 subprojects {
     afterEvaluate {
@@ -21,6 +21,13 @@ subprojects {
             project.extensions.configure<com.android.build.gradle.BaseExtension>("android") {
                 if (namespace == null) {
                     namespace = project.group.toString()
+                }
+                defaultConfig {
+                    externalNativeBuild {
+                        cmake {
+                            arguments("-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
+                        }
+                    }
                 }
             }
         }
