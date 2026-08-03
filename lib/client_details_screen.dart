@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:isar/isar.dart';
 import 'add_consultation_screen.dart';
 import 'transit_consultation_screen.dart';
@@ -40,6 +41,113 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
   List<String> _clinicalTags = [];
   bool _needsReview = false;
   bool _isHeaderExpanded = false;
+
+  final TextEditingController _followUpController = TextEditingController();
+  bool _isAskingFollowUp = false;
+
+  final Map<int, TextEditingController> _consultationFollowUpControllers = {};
+  final Map<int, bool> _consultationAskingMap = {};
+
+  @override
+  void dispose() {
+    for (final controller in _consultationFollowUpControllers.values) {
+      controller.dispose();
+    }
+    _followUpController.dispose();
+    _observationController.dispose();
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _runConsultationFollowUp(Consultation consultation) async {
+    final controller = _consultationFollowUpControllers[consultation.id];
+    if (controller == null) return;
+    final question = controller.text.trim();
+    if (question.isEmpty) return;
+
+    setState(() {
+      _consultationAskingMap[consultation.id] = true;
+    });
+
+    try {
+      final isUnknown =
+          _client!.birthTime == '❓' || !_client!.birthTime.contains(':');
+      final previousContext =
+          '내담자 고민: ${consultation.complaint}\n\nAI 분석 내용:\n${consultation.aiOpinion}';
+      final answer = await AiService.askFollowUpQuestion(
+        previousAnalysis: previousContext,
+        followUpQuestion: question,
+        isTimeUnknown: isUnknown,
+      );
+
+      final updatedOpinion =
+          '${consultation.aiOpinion}\n\n💬 [추가 질문]: $question\n\n🤖 [AI 추가 답변]:\n$answer';
+
+      await DatabaseService.isar.writeTxn(() async {
+        final fresh = await DatabaseService.isar.consultations.get(
+          consultation.id,
+        );
+        if (fresh != null) {
+          fresh.aiOpinion = updatedOpinion;
+          await DatabaseService.isar.consultations.put(fresh);
+        }
+      });
+
+      controller.clear();
+      await _loadClientData();
+      if (mounted) {
+        AppSnackBar.show(context, message: '💡 상담 기록에 추가 질의응답이 저장되었습니다.');
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackBar.show(context, message: '추가 질문 실패: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _consultationAskingMap[consultation.id] = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _runFollowUpAnalysis() async {
+    final question = _followUpController.text.trim();
+    if (question.isEmpty || _aiAnalysisResult == null) return;
+
+    setState(() {
+      _isAskingFollowUp = true;
+    });
+
+    try {
+      final isUnknown =
+          _client!.birthTime == '❓' || !_client!.birthTime.contains(':');
+      final answer = await AiService.askFollowUpQuestion(
+        previousAnalysis: _aiAnalysisResult!,
+        followUpQuestion: question,
+        isTimeUnknown: isUnknown,
+      );
+
+      setState(() {
+        _aiAnalysisResult =
+            '$_aiAnalysisResult\n\n💬 [추가 질문]: $question\n\n🤖 [AI 추가 답변]:\n$answer';
+        _followUpController.clear();
+      });
+      if (mounted) {
+        AppSnackBar.show(context, message: '💡 추가 답변이 작성되었습니다.');
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackBar.show(context, message: '후속 질문 분석 실패: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAskingFollowUp = false;
+        });
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -235,13 +343,6 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
         Navigator.of(context).pop(true);
       }
     }
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    _observationController.dispose();
-    super.dispose();
   }
 
   @override
@@ -1005,6 +1106,33 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
           ],
 
           if (_aiAnalysisResult != null) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: _aiAnalysisResult!));
+                    AppSnackBar.show(
+                      context,
+                      message: '📋 AI 기초 분석 결과가 복사되었습니다.',
+                    );
+                  },
+                  icon: const Icon(Icons.copy_rounded, size: 16),
+                  label: const Text('복사', style: TextStyle(fontSize: 12)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Themes.gold,
+                    side: BorderSide(color: Themes.gold.withValues(alpha: 0.5)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -1017,9 +1145,97 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
                 style: const TextStyle(fontSize: 14, height: 1.7),
               ),
             ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Themes.gold.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(
+                        Icons.question_answer_rounded,
+                        size: 16,
+                        color: Themes.gold,
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        '이어서 추가 질문하기',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Themes.gold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _followUpController,
+                          enabled: !_isAskingFollowUp,
+                          decoration: InputDecoration(
+                            hintText: '예: 2ℎ 목성과 관련해서 재물운은 어떤가요?',
+                            hintStyle: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                color: isDark ? Colors.white24 : Colors.black12,
+                              ),
+                            ),
+                          ),
+                          onSubmitted: (_) => _runFollowUpAnalysis(),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed:
+                            _isAskingFollowUp ? null : _runFollowUpAnalysis,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Themes.gold,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child:
+                            _isAskingFollowUp
+                                ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.black,
+                                  ),
+                                )
+                                : const Icon(Icons.send_rounded, size: 18),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 12),
             Text(
-              '* 분석 결과는 저장되지 않습니다. 필요하면 복사해서 상담 메모에 붙여넣으세요.',
+              '* 분석 결과는 임시 상태이며, 필요시 복사하여 사용하세요.',
               style: TextStyle(
                 fontSize: 11,
                 color: Colors.grey.withValues(alpha: 0.7),
@@ -1046,7 +1262,7 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       itemCount: _consultations.length,
       itemBuilder: (context, index) {
         final consultation = _consultations[index];
@@ -1122,13 +1338,53 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
                     children: [
                       const Divider(height: 10),
                       const SizedBox(height: 8),
-                      const Text(
-                        '내담자 고민',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: Themes.gold,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            '내담자 고민',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: Themes.gold,
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () {
+                              Clipboard.setData(
+                                ClipboardData(text: consultation.complaint),
+                              );
+                              AppSnackBar.show(
+                                context,
+                                message: '📋 내담자 고민(질문)이 복사되었습니다.',
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(4),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.copy_rounded,
+                                    size: 13,
+                                    color: Themes.gold,
+                                  ),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    '질문 복사',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Themes.gold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -1136,13 +1392,53 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
                         style: const TextStyle(fontSize: 14),
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        'AI 임상 분석 (원인 3가지)',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: Themes.gold,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'AI 임상 분석 (원인 3가지)',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: Themes.gold,
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () {
+                              Clipboard.setData(
+                                ClipboardData(text: consultation.aiOpinion),
+                              );
+                              AppSnackBar.show(
+                                context,
+                                message: '📋 AI 분석 내용이 복사되었습니다.',
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(4),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.copy_rounded,
+                                    size: 13,
+                                    color: Themes.gold,
+                                  ),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    'AI 분석 복사',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Themes.gold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -1250,6 +1546,136 @@ class _ClientDetailsScreenState extends State<ClientDetailsScreen>
                                     MaterialTapTargetSize.shrinkWrap,
                               );
                             }).toList(),
+                      ),
+                      const SizedBox(height: 16),
+                      // 💬 상담 이력 내 AI 이어서 추가 질문하기
+                      Builder(
+                        builder: (context) {
+                          _consultationFollowUpControllers.putIfAbsent(
+                            consultation.id,
+                            () => TextEditingController(),
+                          );
+                          final controller =
+                              _consultationFollowUpControllers[consultation
+                                  .id]!;
+                          final isAsking =
+                              _consultationAskingMap[consultation.id] ?? false;
+
+                          return Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).cardColor,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: Themes.gold.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Row(
+                                  children: [
+                                    Icon(
+                                      Icons.question_answer_rounded,
+                                      size: 15,
+                                      color: Themes.gold,
+                                    ),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      '이 상담에 이어서 질문하기',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Themes.gold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: controller,
+                                        enabled: !isAsking,
+                                        decoration: InputDecoration(
+                                          hintText: '예: 이 트랜짓의 영향은 언제까지 지속되나요?',
+                                          hintStyle: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey,
+                                          ),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                horizontal: 10,
+                                                vertical: 8,
+                                              ),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color:
+                                                  Theme.of(
+                                                            context,
+                                                          ).brightness ==
+                                                          Brightness.dark
+                                                      ? Colors.white24
+                                                      : Colors.black12,
+                                            ),
+                                          ),
+                                        ),
+                                        onSubmitted:
+                                            (_) => _runConsultationFollowUp(
+                                              consultation,
+                                            ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ElevatedButton(
+                                      onPressed:
+                                          isAsking
+                                              ? null
+                                              : () => _runConsultationFollowUp(
+                                                consultation,
+                                              ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Themes.gold,
+                                        foregroundColor: Colors.black,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 10,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        minimumSize: Size.zero,
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      child:
+                                          isAsking
+                                              ? const SizedBox(
+                                                width: 14,
+                                                height: 14,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: Colors.black,
+                                                    ),
+                                              )
+                                              : const Icon(
+                                                Icons.send_rounded,
+                                                size: 16,
+                                              ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),

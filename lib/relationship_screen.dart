@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:isar/isar.dart';
 import 'database_service.dart';
 import 'models/client.dart';
@@ -30,10 +31,49 @@ class _RelationshipScreenState extends State<RelationshipScreen>
     _tabController = TabController(length: 2, vsync: this);
   }
 
+  final TextEditingController _followUpController = TextEditingController();
+  bool _isAskingFollowUp = false;
+
   @override
   void dispose() {
+    _followUpController.dispose();
     _tabController?.dispose();
     super.dispose();
+  }
+
+  Future<void> _runFollowUpAnalysis() async {
+    final question = _followUpController.text.trim();
+    if (question.isEmpty || _aiReport.isEmpty) return;
+
+    setState(() {
+      _isAskingFollowUp = true;
+    });
+
+    try {
+      final isTimeUnknownA = _myProfile!.birthTime == 'Unknown' || !_myProfile!.birthTime.contains(':');
+      final isTimeUnknownB = _targetPartner!.birthTime == 'Unknown' || !_targetPartner!.birthTime.contains(':');
+      final isAnyUnknown = isTimeUnknownA || isTimeUnknownB;
+
+      final answer = await AiService.askFollowUpQuestion(
+        previousAnalysis: _aiReport,
+        followUpQuestion: question,
+        isTimeUnknown: isAnyUnknown,
+      );
+
+      setState(() {
+        _aiReport = '$_aiReport\n\n💬 [추가 질문]: $question\n\n🤖 [AI 추가 답변]:\n$answer';
+        _followUpController.clear();
+      });
+      AppSnackBar.show(context, message: '💡 추가 답변이 작성되었습니다.');
+    } catch (e) {
+      AppSnackBar.show(context, message: '후속 질문 분석 실패: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAskingFollowUp = false;
+        });
+      }
+    }
   }
 
   Future<void> _generateAiRelationshipReport() async {
@@ -584,15 +624,35 @@ ${(composite['placements'] as List<String>).take(8).join('\n')}
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Icon(Icons.auto_awesome, color: Themes.gold),
-                          const SizedBox(width: 8),
-                          Text(
-                            'AI 심층 궁합 리포트',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: textColor,
+                          Row(
+                            children: [
+                              const Icon(Icons.auto_awesome, color: Themes.gold),
+                              const SizedBox(width: 8),
+                              Text(
+                                'AI 심층 궁합 리포트',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: textColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(text: _aiReport));
+                              AppSnackBar.show(context, message: '📋 AI 궁합 리포트가 복사되었습니다.');
+                            },
+                            icon: const Icon(Icons.copy_rounded, size: 14),
+                            label: const Text('복사', style: TextStyle(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Themes.gold,
+                              side: BorderSide(color: Themes.gold.withValues(alpha: 0.5)),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
                           ),
                         ],
@@ -604,6 +664,81 @@ ${(composite['placements'] as List<String>).take(8).join('\n')}
                           fontSize: 14,
                           height: 1.5,
                           color: textColor,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Themes.gold.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.question_answer_rounded, size: 16, color: Themes.gold),
+                                SizedBox(width: 6),
+                                Text(
+                                  '궁합 리포트에 이어서 추가 질문하기',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Themes.gold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _followUpController,
+                                    enabled: !_isAskingFollowUp,
+                                    decoration: InputDecoration(
+                                      hintText: '예: 두 사람 대화 중 갈등이 생기면 어떻게 해결해야 할까요?',
+                                      hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(
+                                          color: isDark ? Colors.white24 : Colors.black12,
+                                        ),
+                                      ),
+                                    ),
+                                    onSubmitted: (_) => _runFollowUpAnalysis(),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton(
+                                  onPressed: _isAskingFollowUp ? null : _runFollowUpAnalysis,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Themes.gold,
+                                    foregroundColor: Colors.black,
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  child: _isAskingFollowUp
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.black,
+                                          ),
+                                        )
+                                      : const Icon(Icons.send_rounded, size: 18),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     ],

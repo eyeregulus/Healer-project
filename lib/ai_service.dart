@@ -159,21 +159,27 @@ $complaint
     required String userContent,
     required Preference pref,
   }) async {
-    final isGemini = pref.customEndpoint.contains('generativelanguage');
-    var modelNameSanitized = pref.modelName.trim().toLowerCase().replaceAll(
-      ' ',
-      '-',
-    );
-
+    final endpointRaw = pref.customEndpoint.trim();
+    final endpointLower = endpointRaw.toLowerCase();
+    
+    // Gemini Native URL or OpenAI Compatible URL
+    final isGeminiNative = endpointLower.contains('generativelanguage') ||
+        endpointLower.contains('googleapis');
+        
+    var rawModel = pref.modelName.trim().toLowerCase();
+    
+    // 사용자가 입력한 모델명을 공백만 하이픈(-)으로 변환하여 그대로 구글 서버로 보냅니다.
+    // 예: "Gemini 3.1 Flash Lite" -> "gemini-3.1-flash-lite"
+    String modelNameSanitized = rawModel.replaceAll(' ', '-');
 
     Uri uri;
     Map<String, String> headers;
     Map<String, dynamic> body;
 
-    if (isGemini) {
+    if (isGeminiNative) {
       // Gemini Native REST API
       final url =
-          'https://generativelanguage.googleapis.com/v1beta/models/$modelNameSanitized:generateContent?key=${pref.apiKey}';
+          'https://generativelanguage.googleapis.com/v1beta/models/$modelNameSanitized:generateContent?key=${pref.apiKey.trim()}';
       uri = Uri.parse(url);
       headers = {'Content-Type': 'application/json'};
       body = {
@@ -192,16 +198,20 @@ $complaint
         "generationConfig": {"temperature": 0.7},
       };
     } else {
-      // OpenAI Compatible API
-      final endpoint =
-          pref.customEndpoint.endsWith('/')
-              ? pref.customEndpoint.substring(0, pref.customEndpoint.length - 1)
-              : pref.customEndpoint;
-      final url = '$endpoint/chat/completions';
+      // OpenAI Compatible REST API (Groq, OpenRouter, OpenAI, vLLM etc.)
+      var endpoint = endpointRaw.endsWith('/')
+          ? endpointRaw.substring(0, endpointRaw.length - 1)
+          : endpointRaw;
+      if (!endpoint.startsWith('http://') && !endpoint.startsWith('https://')) {
+        endpoint = 'https://$endpoint';
+      }
+      final url = endpoint.endsWith('/chat/completions')
+          ? endpoint
+          : '$endpoint/chat/completions';
       uri = Uri.parse(url);
       headers = {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ${pref.apiKey}',
+        'Authorization': 'Bearer ${pref.apiKey.trim()}',
       };
       body = {
         'model': modelNameSanitized,
@@ -230,7 +240,7 @@ $complaint
         final json = jsonDecode(responseBody) as Map<String, dynamic>;
         String rawText = '';
 
-        if (isGemini) {
+        if (isGeminiNative) {
           final candidates = json['candidates'] as List<dynamic>?;
           if (candidates != null && candidates.isNotEmpty) {
             final content = candidates[0]['content'] as Map<String, dynamic>;
@@ -316,7 +326,7 @@ $complaint
 - 이 트랜짓 시기를 지혜롭게 건너기 위해 가져야 할 마음가짐을 설명하세요.
 
 [필수 표기 규칙]
-1. 모든 행성, 사인, 어스펙트는 한글 텍스트 대신 반드시 기호(☉, ☽, ☿, ♀, ♂, ♃, ♄, ♅, ♆, ♇, ☊, ☋, ⚵, ⚸, ⚶, ⚴, ⨂ ♈, ♉, ♊, ♋, ♌, ♍, ♎, ♏, ♐, ♑, ♒, ♓, ☌, ✶, □, △, ☍)로만 표기하세요.
+1. 모든 행성, 사인, 어스펙트는 한글 텍스트 대신 반드시 기호(☉, ☽, ☿, ♀, ♂, ♃, ♄, ♅, ♆, ♇, ☊, ☋, ⚷, ⚵, ⚸, ⚶, ⚴, ⚳, ⨂, ♈, ♉, ♊, ♋, ♌, ♍, ♎, ♏, ♐, ♑, ♒, ♓, ☌, ✶, □, △, ☍)로만 표기하세요.
 2. 4원소를 표기할 때는 반드시 한자(火, 土, 空, 水)를 사용하세요.
 3. 결과를 출력할 때 불필요한 서론이나 맺음말을 생략하고, 바로 본론으로 시작하여 간결하게 작성하세요.
 
@@ -399,13 +409,53 @@ $complaint
 $timeConstraintRule
 
 [기호 사용 규칙]
-1. 모든 행성과 사인, 어스펙트는 한글 텍스트 대신 반드시 기호(☉, ☽, ☿, ♀, ♂, ♃, ♄, ♅, ♆, ♇, ♈, ♉, ♊, ♋, ♌, ♍, ♎, ♏, ♐, ♑, ♒, ♓, ☌, ✶, □, △, ☍)로 표기할 것.
+1. 모든 행성과 사인, 어스펙트는 한글 텍스트 대신 반드시 기호(☉, ☽, ☿, ♀, ♂, ♃, ♄, ♅, ♆, ♇, ☊, ☋, ⚷, ⚵, ⚸, ⚶, ⚴, ⚳, ⨂, ♈, ♉, ♊, ♋, ♌, ♍, ♎, ♏, ♐, ♑, ♒, ♓, ☌, ✶, □, △, ☍)로 표기할 것.
 2. 에센셜 디그니티 규칙(Domicile, Exaltation, Detriment, Fall)을 정통 점성학 규칙에 맞추어 지배 행성의 힘과 캐릭터 상태를 판단하세요.
 ''';
 
     return await _callApi(
       systemPrompt: systemPrompt,
       userContent: prompt,
+      pref: pref,
+    );
+  }
+
+  /// 이전 분석 결과에 이어 후속 질의응답을 수행하는 메서드
+  static Future<String> askFollowUpQuestion({
+    required String previousAnalysis,
+    required String followUpQuestion,
+    bool isTimeUnknown = false,
+  }) async {
+    final pref = await DatabaseService.isar.preferences.get(0) ?? Preference();
+
+    if (pref.apiKey.isEmpty &&
+        !pref.customEndpoint.contains('localhost') &&
+        !pref.customEndpoint.contains('127.0.0.1')) {
+      throw Exception('API Key가 설정되어 있지 않습니다. 설정 화면에서 API Key를 등록해 주세요.');
+    }
+
+    final systemPrompt = '''
+당신은 전통 및 현대 점성학을 깊이 있게 연구한 전문 점성가이자 심리 상담가입니다.
+이전에 내담자에게 제공했던 [이전 AI 점성학 분석 결과]를 바탕으로, 내담자의 [추가 질문]에 대해 점성학적 맥락을 유지하며 답변하세요.
+
+[규칙]
+1. 이전 분석 결과와의 일관성을 유지하며 전문적이고 친절하게 답변할 것.
+2. 모든 행성, 사인, 어스펙트는 한글 텍스트 대신 반드시 기호(☉, ☽, ☿, ♀, ♂, ♃, ♄, ♅, ♆, ♇, ☊, ☋, ⚷, ⚵, ⚸, ⚶, ⚴, ⚳, ⨂, ♈, ♉, ♊, ♋, ♌, ♍, ♎, ♏, ♐, ♑, ♒, ♓, ☌, ✶, □, △, ☍)로 표기할 것.
+3. 4원소는 한자(火, 土, 空, 水)로 표기하고, 하우스는 'ℎ'로 표기할 것.
+${isTimeUnknown ? '4. 출생 시간을 모르는 내담자이므로, ℎ(하우스 영역) 및 ASC/MC 관련 포지션 언급은 피하세요.' : ''}
+''';
+
+    final userContent = '''
+[이전 AI 점성학 분석 결과]
+$previousAnalysis
+
+[내담자의 추가 질문]
+$followUpQuestion
+''';
+
+    return await _callApi(
+      systemPrompt: systemPrompt,
+      userContent: userContent,
       pref: pref,
     );
   }

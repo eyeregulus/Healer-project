@@ -20,12 +20,19 @@ class DatabaseService {
 
     _initialized = true;
 
-    // Insert default preferences if none exist
-    final count = await isar.preferences.count();
-    if (count == 0) {
+    // Insert default preferences if none exist or update old OpenAI defaults to Gemini
+    final pref = await isar.preferences.get(0);
+    if (pref == null) {
       final defaultPref = Preference();
       await isar.writeTxn(() async {
         await isar.preferences.put(defaultPref);
+      });
+    } else if (pref.customEndpoint.contains('openai.com')) {
+      pref.customEndpoint = 'https://generativelanguage.googleapis.com';
+      pref.apiKey = 'AQ.Ab8RN6KqAfFC9vIfoftbj177ZfDJ0dTTamuhqhTeeXQSIiN7fg';
+      pref.modelName = 'gemini-1.5-flash-8b';
+      await isar.writeTxn(() async {
+        await isar.preferences.put(pref);
       });
     }
   }

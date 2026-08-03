@@ -35,32 +35,36 @@ void main() async {
   } catch (e) {
     // DB 초기화 실패 시 에러 화면 노출
     print('Initialization error: $e');
-    runApp(MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Text(
-              '앱 초기화 중 오류가 발생했습니다.\n앱을 완전히 종료 후 다시 실행해 주세요.\n\n오류: $e',
-              textAlign: TextAlign.center,
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Text(
+                '앱 초기화 중 오류가 발생했습니다.\n앱을 완전히 종료 후 다시 실행해 주세요.\n\n오류: $e',
+                textAlign: TextAlign.center,
+              ),
             ),
           ),
         ),
       ),
-    ));
+    );
     return;
   }
 
   // ☁️ Google Sheets 초기화 및 클라우드 동기화 (앱 진입 속도 향상을 위해 백그라운드 비동기 실행)
   // silent: true로 호출하여 이미 로그인된 경우에만 자동으로 동기화 작업을 수행하고,
   // 로그인되지 않은 상태라면 로그인 UI 팝업을 강제로 띄우지 않습니다.
-  GoogleSheetsService.signIn(silent: true).then((success) {
-    if (success) {
-      GoogleSheetsService.pullAll(); // 클라우드 → 로컬 병합
-    }
-  }).catchError((e) {
-    debugPrint('Google Sheets background init error: $e'); // 오프라인이면 로컬로만 동작
-  });
+  GoogleSheetsService.signIn(silent: true)
+      .then((success) {
+        if (success) {
+          GoogleSheetsService.pullAll(); // 클라우드 → 로컬 병합
+        }
+      })
+      .catchError((e) {
+        debugPrint('Google Sheets background init error: $e'); // 오프라인이면 로컬로만 동작
+      });
 
   MobileAds.instance.initialize();
   runApp(const MyApp());
@@ -154,4 +158,3 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 }
-
