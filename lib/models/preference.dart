@@ -6,7 +6,7 @@ part 'preference.g.dart';
 class Preference {
   Id id = 0; // Fixed ID for single row settings
 
-  String apiKey = 'AQ.Ab8RN6KqAfFC9vIfoftbj177ZfDJ0dTTamuhqhTeeXQSIiN7fg';
+  String apiKey = '';
   String customEndpoint = 'https://generativelanguage.googleapis.com';
   String modelName = 'gemini-1.5-flash';
 

@@ -29,7 +29,7 @@ class DatabaseService {
       });
     } else if (pref.customEndpoint.contains('openai.com')) {
       pref.customEndpoint = 'https://generativelanguage.googleapis.com';
-      pref.apiKey = 'AQ.Ab8RN6KqAfFC9vIfoftbj177ZfDJ0dTTamuhqhTeeXQSIiN7fg';
+      pref.apiKey = '';
       pref.modelName = 'gemini-1.5-flash-8b';
       await isar.writeTxn(() async {
         await isar.preferences.put(pref);
